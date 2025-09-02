@@ -361,8 +361,13 @@ export class ToolPoisoningScanner implements Scanner {
 
     // Check for bulk tool exposure
     if (configText.includes('expose_all_functions') || 
+        configText.includes('expose-all-functions') ||
         configText.includes('register_all_methods') ||
-        configText.includes('tools: "*"')) {
+        configText.includes('register-all-methods') ||
+        configText.includes('tools: "*"') ||
+        configText.includes('tools":"*"') ||
+        configText.includes('\\"*\\"') ||
+        configText.includes('--tools=')) {
       vulnerabilities.push(this.createVulnerability(
         serverId,
         'bulk-tool-exposure',
@@ -370,6 +375,34 @@ export class ToolPoisoningScanner implements Scanner {
         Severity.CRITICAL,
         'config',
         'expose_all or wildcard pattern'
+      ));
+    }
+
+    // Check for data exfiltration risk (file_read + network_send)
+    if ((configText.includes('file_read') || configText.includes('read_file')) &&
+        (configText.includes('network_send') || configText.includes('http_post') || configText.includes('upload'))) {
+      vulnerabilities.push(this.createVulnerability(
+        serverId,
+        'data-exfiltration-risk',
+        'Tool has both file read and network send capabilities - potential data exfiltration risk',
+        Severity.CRITICAL,
+        'capabilities',
+        'file_read + network_send'
+      ));
+    }
+
+    // Check for code execution capability
+    if (configText.includes('code_execution') || 
+        configText.includes('eval') ||
+        configText.includes('exec') ||
+        configText.includes('spawn_process')) {
+      vulnerabilities.push(this.createVulnerability(
+        serverId,
+        'code-execution-capability',
+        'Tool has code execution capability - extreme security risk',
+        Severity.CRITICAL,
+        'capabilities',
+        'code_execution'
       ));
     }
 
@@ -448,10 +481,13 @@ export class ToolPoisoningScanner implements Scanner {
       ));
     }
 
-    // Check for missing audit logging
-    const hasAuditLog = configText.includes('audit') || 
-                       configText.includes('log_tools') ||
-                       configText.includes('tool_logging');
+    // Check for missing audit logging (exclude metadata.name from check)
+    const configWithoutName = JSON.stringify({...config, metadata: {...config.metadata, name: ''}});
+    const hasAuditLog = configWithoutName.includes('audit_log') || 
+                       configWithoutName.includes('auditLog') ||
+                       configWithoutName.includes('log_tools') ||
+                       configWithoutName.includes('tool_logging') ||
+                       configWithoutName.includes('enable_audit');
 
     if (config.capabilities?.tools && !hasAuditLog) {
       vulnerabilities.push(this.createVulnerability(

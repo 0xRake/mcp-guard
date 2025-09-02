@@ -47,6 +47,7 @@ export enum VulnerabilityType {
   // Compliance
   GDPR_VIOLATION = 'GDPR_VIOLATION',
   SOC2_VIOLATION = 'SOC2_VIOLATION',
+  COMPLIANCE_VIOLATION = 'COMPLIANCE_VIOLATION',
   HIPAA_VIOLATION = 'HIPAA_VIOLATION',
   
   // Multi-tenancy

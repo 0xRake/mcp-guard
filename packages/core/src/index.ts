@@ -10,6 +10,13 @@ export { APIKeyScanner } from './scanners/api-keys';
 export { AuthenticationScanner } from './scanners/authentication';
 export { CommandInjectionScanner } from './scanners/command-injection';
 export { ToolPoisoningScanner } from './scanners/tool-poisoning';
+export { DataExfiltrationScanner } from './scanners/data-exfiltration';
+export { PromptInjectionScanner } from './scanners/prompt-injection';
+export { OAuthSecurityScanner } from './scanners/oauth-security';
+export { ConfusedDeputyScanner } from './scanners/confused-deputy';
+export { RateLimitingScanner } from './scanners/rate-limiting';
+export { SSRFScanner } from './scanners/ssrf';
+export { ComplianceScanner } from './scanners/compliance';
 
 // Export utilities
 export * from './utils';
@@ -22,6 +29,13 @@ import { APIKeyScanner } from './scanners/api-keys';
 import { AuthenticationScanner } from './scanners/authentication';
 import { CommandInjectionScanner } from './scanners/command-injection';
 import { ToolPoisoningScanner } from './scanners/tool-poisoning';
+import { DataExfiltrationScanner } from './scanners/data-exfiltration';
+import { PromptInjectionScanner } from './scanners/prompt-injection';
+import { OAuthSecurityScanner } from './scanners/oauth-security';
+import { ConfusedDeputyScanner } from './scanners/confused-deputy';
+import { RateLimitingScanner } from './scanners/rate-limiting';
+import { SSRFScanner } from './scanners/ssrf';
+import { ComplianceScanner } from './scanners/compliance';
 import type { Scanner, MCPServerConfig, ScanConfig, ScanResult, Vulnerability } from './types';
 
 export class MCPGuard {
@@ -33,6 +47,13 @@ export class MCPGuard {
     this.registerScanner(new AuthenticationScanner());
     this.registerScanner(new CommandInjectionScanner());
     this.registerScanner(new ToolPoisoningScanner());
+    this.registerScanner(new DataExfiltrationScanner());
+    this.registerScanner(new PromptInjectionScanner());
+    this.registerScanner(new OAuthSecurityScanner());
+    this.registerScanner(new ConfusedDeputyScanner());
+    this.registerScanner(new RateLimitingScanner());
+    this.registerScanner(new SSRFScanner());
+    this.registerScanner(new ComplianceScanner());
   }
 
   /**

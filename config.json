@@ -1,0 +1,64 @@
+{
+  "test-server": {
+    "command": "node",
+    "args": ["server.js", "--port", "3000"],
+    "env": {
+      "NODE_ENV": "production",
+      "API_KEY": "sk-1234567890abcdefghijklmnop",
+      "DATABASE_URL": "postgresql://user:password@localhost:5432/mydb",
+      "SECRET_TOKEN": "super-secret-token-123"
+    },
+    "capabilities": {
+      "tools": true,
+      "prompts": true,
+      "resources": true
+    },
+    "metadata": {
+      "name": "test-server",
+      "version": "1.0.0",
+      "description": "Test MCP server with vulnerabilities"
+    }
+  },
+  "vulnerable-server": {
+    "command": "python",
+    "args": ["mcp_server.py", "; cat /etc/passwd"],
+    "env": {
+      "PYTHONPATH": "../../../etc",
+      "FLASK_ENV": "production",
+      "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+      "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    },
+    "auth": {
+      "type": "none"
+    },
+    "capabilities": {
+      "tools": true
+    }
+  },
+  "secure-server": {
+    "command": "node",
+    "args": ["secure-server.js"],
+    "env": {
+      "NODE_ENV": "production",
+      "API_KEY": "${API_KEY}",
+      "DATABASE_URL": "${DATABASE_URL}"
+    },
+    "auth": {
+      "type": "bearer",
+      "token": "${AUTH_TOKEN}"
+    },
+    "oauth": {
+      "authorizationServer": "https://auth.example.com",
+      "clientId": "client-123"
+    },
+    "capabilities": {
+      "tools": false,
+      "prompts": false,
+      "resources": true
+    },
+    "metadata": {
+      "name": "secure-server",
+      "version": "2.0.0"
+    }
+  }
+}

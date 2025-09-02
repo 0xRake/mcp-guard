@@ -14,7 +14,11 @@
       "Bash(./test-everything.sh)",
       "Bash(npx tsx:*)",
       "Bash(pnpm test:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pnpm install:*)",
+      "Bash(./packages/cli/dist/index.js scan config.json)",
+      "Bash(./packages/cli/dist/index.js fix config.json --dry-run)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
