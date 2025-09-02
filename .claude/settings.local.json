@@ -12,7 +12,8 @@
       "Bash(npm run build:*)",
       "Bash(chmod:*)",
       "Bash(./test-everything.sh)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(pnpm test:*)"
     ],
     "deny": [],
     "ask": []

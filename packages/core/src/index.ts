@@ -11,6 +11,12 @@ export { AuthenticationScanner } from './scanners/authentication';
 export { CommandInjectionScanner } from './scanners/command-injection';
 export { ToolPoisoningScanner } from './scanners/tool-poisoning';
 
+// Export utilities
+export * from './utils';
+
+// Export validators
+export * from './validators';
+
 // Scanner registry
 import { APIKeyScanner } from './scanners/api-keys';
 import { AuthenticationScanner } from './scanners/authentication';
