@@ -1,0 +1,34 @@
+{
+  "name": "mcp-guard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise-grade security scanner and protection for Model Context Protocol (MCP) servers",
+  "author": "0xrake",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "typecheck": "turbo run typecheck",
+    "cli": "pnpm --filter @mcp-guard/cli run start",
+    "server": "pnpm --filter @mcp-guard/server run start",
+    "web": "pnpm --filter @mcp-guard/web run dev",
+    "release": "changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "@types/node": "^20.11.0",
+    "turbo": "^1.12.0",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "workspaces": [
+    "packages/*"
+  ]
+}
