@@ -16,7 +16,7 @@ import { APIKeyScanner } from './scanners/api-keys';
 import { AuthenticationScanner } from './scanners/authentication';
 import { CommandInjectionScanner } from './scanners/command-injection';
 import { ToolPoisoningScanner } from './scanners/tool-poisoning';
-import type { Scanner, MCPServerConfig, ScanConfig, ScanResult, Vulnerability, Severity } from './types';
+import type { Scanner, MCPServerConfig, ScanConfig, ScanResult, Vulnerability } from './types';
 
 export class MCPGuard {
   private scanners: Scanner[] = [];
@@ -57,20 +57,22 @@ export class MCPGuard {
     // Run all scanners on each configuration
     for (const [serverName, serverConfig] of configs) {
       // Add server name to metadata if not present
-      if (!serverConfig.metadata) {
-        serverConfig.metadata = {};
-      }
-      if (!serverConfig.metadata.name) {
-        serverConfig.metadata.name = serverName;
-      }
+      if (typeof serverConfig === 'object' && serverConfig !== null) {
+        if (!serverConfig.metadata) {
+          serverConfig.metadata = {};
+        }
+        if (!serverConfig.metadata.name && typeof serverName === 'string') {
+          serverConfig.metadata.name = serverName;
+        }
 
-      for (const scanner of this.scanners) {
-        if (!options?.excludeTypes?.includes(scanner.name as any)) {
-          try {
-            const vulnerabilities = await scanner.scan(serverConfig, options);
-            allVulnerabilities.push(...vulnerabilities);
-          } catch (error) {
-            console.error(`❌ Scanner ${scanner.name} failed:`, error);
+        for (const scanner of this.scanners) {
+          if (!options?.excludeTypes?.includes(scanner.name as any)) {
+            try {
+              const vulnerabilities = await scanner.scan(serverConfig, options);
+              allVulnerabilities.push(...vulnerabilities);
+            } catch (error) {
+              console.error(`❌ Scanner ${scanner.name} failed:`, error);
+            }
           }
         }
       }
