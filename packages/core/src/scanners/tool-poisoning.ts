@@ -501,6 +501,75 @@ export class ToolPoisoningScanner implements Scanner {
         dangerous: DANGEROUS_TOOL_NAMES.includes(match[1].toLowerCase())
       });
     }
+    
+    // Also check command arguments for tool names
+    if (config.args) {
+      for (const arg of config.args) {
+        // Check for --expose-tool or similar patterns
+        if (arg.includes('execute_command') || arg.includes('delete_file') || 
+            arg.includes('get_credentials') || arg.includes('steal_token')) {
+          const toolName = arg.replace(/--expose-tool[=\s]*/, '')
+                              .replace(/[{}"']/g, '')
+                              .replace(/.*name['":\s]+/, '');
+          if (toolName) {
+            tools.push({
+              name: toolName,
+              description: 'Found in command arguments',
+              dangerous: true
+            });
+          }
+        }
+        
+        // Try to parse JSON tool definitions from arguments
+        try {
+          // Check if arg looks like JSON
+          if (arg.includes('{') && arg.includes('}')) {
+            const jsonStr = arg.substring(arg.indexOf('{'), arg.lastIndexOf('}') + 1);
+            const parsed = JSON.parse(jsonStr);
+            
+            if (parsed.name) {
+              tools.push({
+                name: parsed.name,
+                description: 'Parsed from JSON argument',
+                parameters: parsed.parameters || {},
+                dangerous: DANGEROUS_TOOL_NAMES.includes(parsed.name.toLowerCase())
+              });
+            }
+          }
+        } catch {
+          // If JSON parsing fails, use regex fallback
+          const jsonMatch = arg.match(/\{.*"name"\s*:\s*"([^"]+)".*\}/);
+          if (jsonMatch) {
+            // Try to extract parameters too
+            const paramsMatch = arg.match(/"parameters"\s*:\s*(\{[^}]+\})/);
+            let params = {};
+            if (paramsMatch) {
+              try {
+                params = JSON.parse(paramsMatch[1]);
+              } catch {
+                // If params parsing fails, check for common dangerous patterns
+                if (arg.includes('"command"') || arg.includes('"query"') || arg.includes('"path"')) {
+                  params = {
+                    command: arg.includes('"command"') ? { type: 'string' } : undefined,
+                    query: arg.includes('"query"') ? { type: 'string' } : undefined,
+                    path: arg.includes('"path"') ? { type: 'string' } : undefined
+                  };
+                  // Remove undefined entries
+                  Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+                }
+              }
+            }
+            
+            tools.push({
+              name: jsonMatch[1],
+              description: 'Extracted from JSON argument',
+              parameters: params,
+              dangerous: DANGEROUS_TOOL_NAMES.includes(jsonMatch[1].toLowerCase())
+            });
+          }
+        }
+      }
+    }
 
     // Add simulated tools based on server type
     if (config.command.includes('database')) {
