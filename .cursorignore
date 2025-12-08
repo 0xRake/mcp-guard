@@ -1,0 +1,24 @@
+# mcp-guard .cursorignore
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+.next/
+
+# Lock files
+pnpm-lock.yaml
+bun.lock
+
+# Test artifacts
+coverage/
+
+# External/Personal (never index if accidentally present)
+.rake/
+data/
+
+# IDE
+.vscode/
