@@ -108,6 +108,10 @@ export class CommandInjectionScanner implements Scanner {
     const vulnerabilities: Vulnerability[] = [];
     const command = config.command;
     const args = config.args || [];
+    
+    // Skip if no command is defined
+    if (!command) return vulnerabilities;
+    
     const fullCommand = `${command} ${args.join(' ')}`;
 
     // Check main command for dangerous patterns

@@ -135,6 +135,9 @@ export class AuthenticationScanner implements Scanner {
   }
 
   private isSecurePublicServer(config: MCPServerConfig): boolean {
+    // Return false if no command is defined
+    if (!config.command) return false;
+    
     const command = config.command.toLowerCase();
     const args = config.args?.join(' ').toLowerCase() || '';
     const fullCommand = `${command} ${args}`;
@@ -146,7 +149,7 @@ export class AuthenticationScanner implements Scanner {
 
   private serverRequiresAuth(config: MCPServerConfig): boolean {
     const serverName = config.metadata?.name?.toLowerCase() || '';
-    const command = config.command.toLowerCase();
+    const command = config.command?.toLowerCase() || '';
     const args = config.args?.join(' ').toLowerCase() || '';
     
     // Check if server name/command contains sensitive keywords
