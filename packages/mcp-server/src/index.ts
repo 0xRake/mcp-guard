@@ -10,6 +10,12 @@ import {
 import mcpGuard from '@mcp-guard/core';
 import type { ScanResult, MCPServerConfig } from '@mcp-guard/core';
 import { z } from 'zod';
+import { 
+  scanConfigTool,
+  checkVulnerabilitiesTool,
+  monitorTrafficTool,
+  generateReportTool
+} from './tools/index.js';
 
 // Tool definitions
 const TOOLS: Tool[] = [
@@ -47,7 +53,7 @@ const TOOLS: Tool[] = [
           type: 'array',
           items: {
             type: 'string',
-            enum: ['api-keys', 'authentication', 'command-injection', 'tool-poisoning']
+            enum: ['api-keys', 'authentication', 'command-injection', 'tool-poisoning', 'data-exfiltration', 'prompt-injection', 'oauth-security', 'confused-deputy', 'rate-limiting', 'ssrf', 'compliance']
           },
           description: 'Vulnerability types to check'
         }
@@ -56,22 +62,30 @@ const TOOLS: Tool[] = [
     }
   },
   {
-    name: 'monitor_config',
-    description: 'Start monitoring configuration for security issues',
+    name: 'monitor_traffic',
+    description: 'Monitor real-time traffic and detect anomalies',
     inputSchema: {
       type: 'object',
       properties: {
-        path: {
-          type: 'string',
-          description: 'Path to configuration file to monitor'
+        config: {
+          type: 'object',
+          description: 'Configuration to monitor'
         },
         interval: {
           type: 'number',
-          description: 'Check interval in seconds',
-          default: 30
+          description: 'Monitoring interval in milliseconds',
+          default: 5000
+        },
+        metrics: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Metrics to track',
+          default: ['all']
         }
       },
-      required: ['path']
+      required: ['config']
     }
   },
   {
@@ -265,73 +279,49 @@ async function main() {
     try {
       switch (name) {
         case 'scan_config': {
-          const config = args.config as MCPServerConfig;
-          const depth = args.depth as string || 'standard';
-          
-          const result = await mcpGuard.scan(
-            { default: config },
-            { depth: depth as any }
-          );
+          const result = await scanConfigTool.execute({
+            config: args.config as MCPServerConfig,
+            depth: args.depth as any
+          });
           
           return {
             content: [{
               type: 'text',
-              text: formatScanResult(result)
+              text: scanConfigTool.formatResult(result)
             }]
           };
         }
 
         case 'check_vulnerabilities': {
-          const config = args.config as MCPServerConfig;
-          const types = args.types as string[] || ['api-keys', 'authentication', 'command-injection', 'tool-poisoning'];
-          
-          const result = await mcpGuard.scan(
-            { default: config },
-            { excludeTypes: [] } // Include all types then filter
-          );
-          
-          // Filter vulnerabilities by requested types
-          const filtered = {
-            ...result,
-            vulnerabilities: result.vulnerabilities.filter(v => 
-              types.some(t => v.type.toLowerCase().includes(t))
-            )
-          };
+          const vulnerabilities = await checkVulnerabilitiesTool.execute({
+            config: args.config as MCPServerConfig,
+            types: args.types as string[]
+          });
           
           return {
             content: [{
               type: 'text',
-              text: formatScanResult(filtered)
+              text: checkVulnerabilitiesTool.formatResult(vulnerabilities)
             }]
           };
         }
 
-        case 'monitor_config': {
-          const path = args.path as string;
-          const interval = (args.interval as number) || 30;
+        case 'monitor_traffic': {
+          const sessionId = await monitorTrafficTool.start({
+            config: args.config as MCPServerConfig,
+            interval: args.interval as number,
+            metrics: args.metrics as string[]
+          });
           
-          // Clear existing monitoring for this path
-          if (monitoringSessions.has(path)) {
-            clearInterval(monitoringSessions.get(path)!);
-          }
-          
-          // Start new monitoring
-          const intervalId = setInterval(async () => {
-            try {
-              // In real implementation, would read file from path
-              // For now, we'll just return a status message
-              console.log(`[Monitor] Checking ${path}...`);
-            } catch (error) {
-              console.error(`[Monitor] Error checking ${path}:`, error);
-            }
-          }, interval * 1000);
-          
-          monitoringSessions.set(path, intervalId);
+          // Set up anomaly listener
+          monitorTrafficTool.on('anomaly-detected', (anomaly) => {
+            console.error(`[ANOMALY] ${anomaly.message}`);
+          });
           
           return {
             content: [{
               type: 'text',
-              text: `Started monitoring ${path} every ${interval} seconds. Session ID: ${path}`
+              text: `Started traffic monitoring. Session ID: ${sessionId}\nMonitoring real-time traffic patterns and anomalies...`
             }]
           };
         }
@@ -357,11 +347,12 @@ async function main() {
         }
 
         case 'generate_report': {
-          const config = args.config as MCPServerConfig;
-          const format = args.format as string || 'json';
-          
-          const result = await mcpGuard.scan({ default: config });
-          const report = generateReport(result, format);
+          const report = await generateReportTool.execute({
+            config: args.config as MCPServerConfig,
+            format: args.format as any,
+            includeRemediation: true,
+            includeCompliance: false
+          });
           
           return {
             content: [{

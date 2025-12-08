@@ -1,203 +1,189 @@
-# @mcp-guard/mcp-server
+# MCP-Guard Server
 
-MCP server implementation for real-time security monitoring and protection of Model Context Protocol servers.
+A Model Context Protocol (MCP) server that provides real-time security scanning and monitoring capabilities for MCP configurations.
+
+## Features
+
+- 🔍 **Real-time Security Scanning** - Comprehensive vulnerability detection
+- 🛡️ **11 Security Scanners** - API keys, authentication, injection attacks, and more
+- 📊 **Traffic Monitoring** - Real-time anomaly detection
+- 📄 **Multi-format Reports** - JSON, Markdown, HTML, SARIF, PDF
+- 🔧 **Multiple Transports** - Stdio and WebSocket support
 
 ## Installation
 
+### For Claude Desktop
+
+Run the installation script:
+
 ```bash
-npm install @mcp-guard/mcp-server
-# or
-pnpm add @mcp-guard/mcp-server
+./install-mcp.sh
 ```
 
-## Configuration
-
-Add to your Claude Desktop configuration:
+Or manually configure by adding to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "mcp-guard": {
-      "command": "npx",
-      "args": ["-y", "@mcp-guard/mcp-server"]
+      "command": "node",
+      "args": ["/path/to/mcp-guard/packages/mcp-server/dist/server.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
     }
   }
 }
 ```
 
-Or run directly:
+### For Other MCP Clients
 
+1. Build the server:
 ```bash
-npx @mcp-guard/mcp-server
+pnpm install
+pnpm build
+```
+
+2. Run with stdio transport:
+```bash
+node dist/server.js
+```
+
+3. Or run with WebSocket transport:
+```bash
+node dist/server.js --websocket --port 8080
 ```
 
 ## Available Tools
 
-### scan_config
-Scan MCP server configuration for security vulnerabilities.
+### 1. scan_config
+Performs comprehensive security scanning of MCP configurations.
 
 **Parameters:**
-- `config` (object, required) - MCP server configuration to scan
-- `depth` (string) - Scan depth: quick, standard, comprehensive, paranoid
+- `config` (object, required): MCP server configuration to scan
+- `depth` (string): Scan depth - `quick`, `standard`, `comprehensive`, `paranoid`
 
 **Example:**
 ```json
 {
-  "tool": "scan_config",
+  "name": "scan_config",
   "arguments": {
     "config": {
-      "command": "node",
-      "args": ["server.js"],
-      "env": { "API_KEY": "sk-..." }
+      "name": "my-server",
+      "tools": [...]
     },
     "depth": "comprehensive"
   }
 }
 ```
 
-### check_vulnerabilities
-Check for specific vulnerability types in configuration.
+### 2. check_vulnerabilities
+Checks for specific vulnerability types.
 
 **Parameters:**
-- `config` (object, required) - Configuration to check
-- `types` (array) - Vulnerability types: api-keys, authentication, command-injection, tool-poisoning
+- `config` (object, required): Configuration to check
+- `types` (array): Vulnerability types to check
+  - `api-keys`
+  - `authentication`
+  - `command-injection`
+  - `tool-poisoning`
+  - `data-exfiltration`
+  - `prompt-injection`
+  - `oauth-security`
+  - `confused-deputy`
+  - `rate-limiting`
+  - `ssrf`
+  - `compliance`
 
-**Example:**
-```json
-{
-  "tool": "check_vulnerabilities",
-  "arguments": {
-    "config": { ... },
-    "types": ["api-keys", "authentication"]
-  }
-}
-```
-
-### monitor_config
-Start monitoring configuration for security issues.
-
-**Parameters:**
-- `path` (string, required) - Path to configuration file
-- `interval` (number) - Check interval in seconds (default: 30)
-
-**Example:**
-```json
-{
-  "tool": "monitor_config",
-  "arguments": {
-    "path": "/path/to/config.json",
-    "interval": 60
-  }
-}
-```
-
-### auto_fix
-Automatically fix detected vulnerabilities.
+### 3. monitor_traffic
+Monitors real-time traffic and detects anomalies.
 
 **Parameters:**
-- `config` (object, required) - Configuration with vulnerabilities
-- `dryRun` (boolean) - Preview fixes without applying (default: false)
+- `config` (object, required): Configuration to monitor
+- `interval` (number): Monitoring interval in milliseconds (default: 5000)
+- `metrics` (array): Metrics to track (default: ["all"])
 
-**Example:**
-```json
-{
-  "tool": "auto_fix",
-  "arguments": {
-    "config": { ... },
-    "dryRun": true
-  }
-}
-```
-
-### generate_report
-Generate security report for MCP configuration.
+### 4. generate_report
+Generates security reports in various formats.
 
 **Parameters:**
-- `config` (object, required) - Configuration to analyze
-- `format` (string) - Report format: json, markdown, html, sarif
+- `config` (object, required): Configuration to analyze
+- `format` (string): Report format - `json`, `markdown`, `html`, `sarif`, `pdf`
+- `includeRemediation` (boolean): Include remediation steps (default: true)
+- `includeCompliance` (boolean): Include compliance checks (default: false)
 
-**Example:**
+## Transport Options
+
+### Stdio Transport (Default)
+Used by Claude Desktop and CLI tools:
+```bash
+node dist/server.js
+```
+
+### WebSocket Transport
+For web applications and remote connections:
+```bash
+node dist/server.js --websocket --port 8080
+```
+
+## Configuration
+
+### Environment Variables
+- `NODE_ENV`: Set to `production` for production use
+- `MCP_GUARD_LOG_LEVEL`: Logging level (`debug`, `info`, `warn`, `error`)
+
+### MCP Configuration (mcp.json)
 ```json
 {
-  "tool": "generate_report",
-  "arguments": {
-    "config": { ... },
-    "format": "markdown"
+  "mcpServers": {
+    "mcp-guard": {
+      "command": "node",
+      "args": ["./dist/server.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
   }
 }
 ```
-
-### risk_score
-Calculate security risk score for configuration.
-
-**Parameters:**
-- `config` (object, required) - Configuration to score
-
-**Returns:**
-```json
-{
-  "score": 75,
-  "grade": "C",
-  "risk_level": "MEDIUM",
-  "vulnerabilities": {
-    "critical": 0,
-    "high": 2,
-    "medium": 3,
-    "low": 1
-  }
-}
-```
-
-## Usage with Claude
-
-Once configured, you can use MCP-Guard tools in Claude:
-
-```
-Use the scan_config tool to check this MCP server configuration for vulnerabilities:
-{
-  "command": "python",
-  "args": ["server.py"],
-  "env": {
-    "DATABASE_URL": "postgresql://user:pass@localhost/db"
-  }
-}
-```
-
-Claude will use the MCP-Guard server to scan the configuration and report any security issues found.
-
-## Features
-
-- **Real-time Scanning** - Scan configurations on demand
-- **Continuous Monitoring** - Watch configuration files for changes
-- **Auto-remediation** - Fix vulnerabilities automatically
-- **Multiple Report Formats** - JSON, Markdown, HTML, SARIF
-- **Risk Scoring** - Calculate security risk scores
-- **Selective Scanning** - Check specific vulnerability types
 
 ## Security Scanners
 
-The MCP server includes all scanners from @mcp-guard/core:
+The server includes 11 specialized security scanners:
 
-1. **API Key Scanner** - Detects exposed secrets and credentials
-2. **Authentication Scanner** - Checks for missing or weak authentication
-3. **Command Injection Scanner** - Identifies injection vulnerabilities
-4. **Tool Poisoning Scanner** - Detects malicious tool definitions
+1. **API Keys Scanner** - Detects exposed API keys and secrets
+2. **Authentication Scanner** - Identifies authentication vulnerabilities
+3. **Command Injection Scanner** - Detects command injection risks
+4. **Tool Poisoning Scanner** - Identifies malicious tool configurations
+5. **Data Exfiltration Scanner** - Detects potential data leaks
+6. **Prompt Injection Scanner** - Identifies prompt manipulation attempts
+7. **OAuth Security Scanner** - Checks OAuth implementation security
+8. **Confused Deputy Scanner** - Detects privilege escalation risks
+9. **Rate Limiting Scanner** - Identifies missing rate limits
+10. **SSRF Scanner** - Detects server-side request forgery vulnerabilities
+11. **Compliance Scanner** - Checks regulatory compliance (GDPR, HIPAA, etc.)
 
-## Integration
+## Development
 
-### GitHub Actions
+### Building from Source
+```bash
+# Install dependencies
+pnpm install
 
-```yaml
-- name: Scan MCP Configuration
-  run: |
-    npx @mcp-guard/mcp-server scan-config config.json
+# Build the server
+pnpm build
+
+# Run in development mode
+pnpm dev
 ```
 
-### Pre-commit Hook
-
+### Testing
 ```bash
-#!/bin/sh
-npx @mcp-guard/mcp-server scan-config claude_desktop_config.json || exit 1
+# Run simple test
+node test-simple.js
+
+# Run MCP protocol test
+node test-mcp.js
 ```
 
 ## License
