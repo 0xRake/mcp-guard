@@ -5,18 +5,12 @@
 // Export all types
 export * from './types';
 
-// Export scanners
-export { APIKeyScanner } from './scanners/api-keys';
-export { AuthenticationScanner } from './scanners/authentication';
-export { CommandInjectionScanner } from './scanners/command-injection';
-export { ToolPoisoningScanner } from './scanners/tool-poisoning';
-export { DataExfiltrationScanner } from './scanners/data-exfiltration';
-export { PromptInjectionScanner } from './scanners/prompt-injection';
-export { OAuthSecurityScanner } from './scanners/oauth-security';
-export { ConfusedDeputyScanner } from './scanners/confused-deputy';
-export { RateLimitingScanner } from './scanners/rate-limiting';
-export { SSRFScanner } from './scanners/ssrf';
-export { ComplianceScanner } from './scanners/compliance';
+// Export new consolidated domains
+export { DataProtectionDomain } from './domains/data-protection';
+export { ExecutionControlDomain } from './domains/execution-control';
+export { IdentityAccessControlDomain } from './domains/identity-access-control';
+export { ConfigurationAssuranceDomain } from './domains/configuration-assurance';
+export { ComplianceGovernanceDomain } from './domains/compliance-governance';
 
 // Export utilities
 export * from './utils';
@@ -24,36 +18,24 @@ export * from './utils';
 // Export validators
 export * from './validators';
 
-// Scanner registry
-import { APIKeyScanner } from './scanners/api-keys';
-import { AuthenticationScanner } from './scanners/authentication';
-import { CommandInjectionScanner } from './scanners/command-injection';
-import { ToolPoisoningScanner } from './scanners/tool-poisoning';
-import { DataExfiltrationScanner } from './scanners/data-exfiltration';
-import { PromptInjectionScanner } from './scanners/prompt-injection';
-import { OAuthSecurityScanner } from './scanners/oauth-security';
-import { ConfusedDeputyScanner } from './scanners/confused-deputy';
-import { RateLimitingScanner } from './scanners/rate-limiting';
-import { SSRFScanner } from './scanners/ssrf';
-import { ComplianceScanner } from './scanners/compliance';
+// Scanner registry using new consolidated domains
+import { DataProtectionDomain } from './domains/data-protection';
+import { ExecutionControlDomain } from './domains/execution-control';
+import { IdentityAccessControlDomain } from './domains/identity-access-control';
+import { ConfigurationAssuranceDomain } from './domains/configuration-assurance';
+import { ComplianceGovernanceDomain } from './domains/compliance-governance';
 import type { Scanner, MCPServerConfig, ScanConfig, ScanResult, Vulnerability } from './types';
 
 export class MCPGuard {
   private scanners: Scanner[] = [];
   
   constructor() {
-    // Register default scanners
-    this.registerScanner(new APIKeyScanner());
-    this.registerScanner(new AuthenticationScanner());
-    this.registerScanner(new CommandInjectionScanner());
-    this.registerScanner(new ToolPoisoningScanner());
-    this.registerScanner(new DataExfiltrationScanner());
-    this.registerScanner(new PromptInjectionScanner());
-    this.registerScanner(new OAuthSecurityScanner());
-    this.registerScanner(new ConfusedDeputyScanner());
-    this.registerScanner(new RateLimitingScanner());
-    this.registerScanner(new SSRFScanner());
-    this.registerScanner(new ComplianceScanner());
+    // Register new consolidated domain scanners
+    this.registerScanner(new DataProtectionDomain());
+    this.registerScanner(new ExecutionControlDomain());
+    this.registerScanner(new IdentityAccessControlDomain());
+    this.registerScanner(new ConfigurationAssuranceDomain());
+    this.registerScanner(new ComplianceGovernanceDomain());
   }
 
   /**

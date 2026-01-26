@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mcp-guard": {
+      "command": "node",
+      "args": [
+        "/Users/rake/Developer/GitHub/mcp-guard/packages/mcp-server/dist/server.js"
+      ],
+      "env": {
+        "NODE_ENV": "production",
+        "MCP_GUARD_LOG_LEVEL": "info"
+      }
+    }
+  }
+}

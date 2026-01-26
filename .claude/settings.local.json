@@ -18,7 +18,18 @@
       "Bash(pnpm install:*)",
       "Bash(./packages/cli/dist/index.js scan config.json)",
       "Bash(./packages/cli/dist/index.js fix config.json --dry-run)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(pnpm init:*)",
+      "Bash(pnpm run:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(npm run scan:*)",
+      "Bash(npx tsup:*)",
+      "Bash(./demo.sh)",
+      "Bash(pkill:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(exit)",
+      "Bash(pnpm --filter @mcp-guard/core test:*)"
     ],
     "deny": [],
     "ask": []
