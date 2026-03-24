@@ -50,11 +50,20 @@ export class IdentityAccessControlDomain implements Scanner {
     }
     
     // Check for weak authentication
-    if (config.auth?.type === 'basic' && config.auth.credentials?.password === 'admin123') {
-      vulnerabilities.push(this.createVulnerability(
-        serverId, 'Weak Authentication', Severity.HIGH, 'auth',
-        'Default credentials detected', 'Default admin credentials', VulnerabilityType.WEAK_AUTHENTICATION
-      ));
+    if (config.auth?.type === 'basic' && config.auth.credentials?.password) {
+      const weakPasswords = [
+        'password', '123456', 'password123', 'admin', 'letmein',
+        'qwerty', 'abc123', '111111', 'password1', 'admin123',
+        'root', 'test', 'guest', 'master', 'changeme',
+        'welcome', 'default', '12345678', 'iloveyou', 'dragon'
+      ];
+      const pwd = config.auth.credentials.password.toLowerCase();
+      if (weakPasswords.includes(pwd) || config.auth.credentials.password.length < 8) {
+        vulnerabilities.push(this.createVulnerability(
+          serverId, 'Weak Authentication', Severity.HIGH, 'auth',
+          'Weak or default credentials detected', 'Weak password in use', VulnerabilityType.WEAK_AUTHENTICATION
+        ));
+      }
     }
     
     return vulnerabilities;

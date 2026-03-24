@@ -16,7 +16,7 @@ const exampleConfig: ClaudeDesktopConfig = {
       args: ["-y", "@modelcontextprotocol/server-github"],
       env: {
         // ⚠️ VULNERABILITY: Hardcoded GitHub token
-        GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+        GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_exampleDONOTUSEINPRODUCTION00000000000"
       }
     },
     "openai-server": {
@@ -25,7 +25,7 @@ const exampleConfig: ClaudeDesktopConfig = {
         "server.js",
         // ⚠️ VULNERABILITY: API key in command line
         "--api-key", 
-        "sk-1234567890abcdefghijklmnopqrstuvwxyz1234567890ab"
+        "sk-example-INSECURE-DO-NOT-USE-IN-PRODUCTION-000000"
       ],
       metadata: {
         name: "OpenAI Integration Server",
@@ -37,7 +37,7 @@ const exampleConfig: ClaudeDesktopConfig = {
       args: ["db_server.py"],
       env: {
         // ⚠️ VULNERABILITY: Database credentials exposed
-        DATABASE_URL: "postgresql://admin:SuperSecret123!@prod.db.example.com:5432/production",
+        DATABASE_URL: "postgresql://admin:EXAMPLE_PASSWORD@db.example.com:5432/demo",
         // This is OK - using placeholder
         API_TOKEN: "${API_TOKEN}"
       }

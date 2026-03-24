@@ -123,7 +123,19 @@ const SSRF_PROTECTION = {
     /^fc00:/,       // IPv6 private
     /^fe80:/,       // IPv6 link-local
     /^::1$/,        // IPv6 loopback
-    /^0\.0\.0\.0/   // All interfaces
+    /^0\.0\.0\.0/,  // All interfaces
+    /^localhost$/i,           // Literal localhost
+    /^0x[0-9a-f]+/i,         // Hex-encoded IPs (e.g., 0x7f000001)
+    /^0[0-7]+\./,            // Octal-encoded IPs (e.g., 0177.0.0.1)
+    /^::ffff:/i,             // IPv6-mapped IPv4
+    /^\[::1\]$/,             // Bracketed IPv6 loopback
+    /^2130706433$/,          // Decimal 127.0.0.1
+    /^017700000001$/         // Octal 127.0.0.1
+  ],
+
+  URL_SHORTENERS: [
+    'bit.ly', 'tinyurl.com', 't.co', 'goo.gl',
+    'ow.ly', 'is.gd', 'buff.ly', 'rb.gy', 'short.io'
   ],
   
   METADATA_ENDPOINTS: [

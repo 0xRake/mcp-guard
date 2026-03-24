@@ -451,7 +451,12 @@ export class ComplianceScanner implements Scanner {
   }
 
   private hasDefaultCredentials(text: string): boolean {
-    const defaults = ['admin:admin', 'root:root', 'test:test', 'demo:demo', 'password123'];
+    const defaults = [
+      'admin:admin', 'root:root', 'test:test', 'demo:demo',
+      'admin:password', 'root:password', 'user:user', 'guest:guest',
+      'admin:123456', 'root:123456', 'admin:admin123', 'root:toor',
+      'password123', 'changeme', 'default', 'letmein'
+    ];
     return defaults.some(d => text.includes(d));
   }
 
@@ -501,7 +506,7 @@ export class ComplianceScanner implements Scanner {
       references: this.getComplianceReferences(standard),
       cwe: ['CWE-693', 'CWE-710', 'CWE-254'],
       compliance: complianceFlags as any,
-      discoveredAt: new Date().toISOString()
+      discoveredAt: new Date()
     };
   }
 
@@ -538,7 +543,7 @@ export class ComplianceScanner implements Scanner {
         'audit: { logging: true, monitoring: true, alerting: true }'
       ]
     };
-    return commands[standard] || commands.GENERAL;
+    return commands[standard] || commands.GENERAL!;
   }
 
   private getComplianceDocumentation(standard: string): string {
@@ -550,7 +555,7 @@ export class ComplianceScanner implements Scanner {
       'PCI-DSS': 'https://www.pcisecuritystandards.org/',
       GENERAL: 'https://owasp.org/www-project-top-ten/'
     };
-    return docs[standard] || docs.GENERAL;
+    return docs[standard] || docs.GENERAL!;
   }
 
   private getComplianceReferences(standard: string): string[] {
@@ -572,7 +577,7 @@ export class ComplianceScanner implements Scanner {
         'https://cwe.mitre.org/top25/'
       ]
     };
-    return refs[standard] || refs.GENERAL;
+    return refs[standard] || refs.GENERAL!;
   }
 
   private calculateScore(severity: Severity): number {

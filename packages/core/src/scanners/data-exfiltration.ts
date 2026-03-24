@@ -525,7 +525,7 @@ export class DataExfiltrationScanner implements Scanner {
         hipaa: true,
         iso27001: true
       },
-      discoveredAt: new Date().toISOString()
+      discoveredAt: new Date()
     };
   }
 

@@ -40,7 +40,7 @@ export class AuthMiddleware {
         }) as JWTPayload;
       }
     } catch (error) {
-      console.error('Token validation failed:', error);
+      console.error('Token validation failed:', error instanceof Error ? error.message : 'Unknown error');
       return null;
     }
 

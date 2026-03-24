@@ -404,7 +404,7 @@ export class OAuthSecurityScanner implements Scanner {
 
       // Check for weak JWT secrets
       const jwtSecretMatch = configText.match(/jwt.*secret['":\s]*([^'",\s]+)/);
-      if (jwtSecretMatch && jwtSecretMatch[1].length < 32) {
+      if (jwtSecretMatch && jwtSecretMatch[1] && jwtSecretMatch[1].length < 32) {
         vulnerabilities.push(this.createVulnerability(
           serverId,
           'weak-jwt-secret',
@@ -511,7 +511,7 @@ export class OAuthSecurityScanner implements Scanner {
         hipaa: true,
         iso27001: true
       },
-      discoveredAt: new Date().toISOString()
+      discoveredAt: new Date()
     };
   }
 

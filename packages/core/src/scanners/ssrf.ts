@@ -498,7 +498,7 @@ export class SSRFScanner implements Scanner {
         hipaa: false,
         iso27001: true
       },
-      discoveredAt: new Date().toISOString()
+      discoveredAt: new Date()
     };
   }
 

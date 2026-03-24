@@ -3,17 +3,26 @@
   "version": "1.0.0",
   "description": "MCP server implementation for real-time security monitoring",
   "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@mcp-guard/core": "workspace:*",
-    "@modelcontextprotocol/sdk": "^0.6.0",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "jsonwebtoken": "^9.0.2",
     "jose": "^5.2.0",
     "zod": "^3.22.4",
@@ -22,7 +31,8 @@
   "devDependencies": {
     "@types/ws": "^8.5.10",
     "tsup": "^8.0.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
   },
   "engines": {
     "node": ">=20.0.0"

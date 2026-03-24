@@ -3,6 +3,7 @@
  * Following OAuth 2.1 and latest MCP security specifications
  */
 
+
 // Severity levels based on CVSS 3.1
 export enum Severity {
   CRITICAL = 'CRITICAL', // 9.0-10.0

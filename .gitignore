@@ -42,6 +42,11 @@ test-output.tmp
 .env.local
 .env.*.local
 
+# Build artifacts
+.mcp-guard-build/
+.opencode/
+.claude/
+
 # Temporary files
 tmp/
 temp/

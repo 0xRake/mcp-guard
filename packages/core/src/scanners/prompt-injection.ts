@@ -411,7 +411,7 @@ export class PromptInjectionScanner implements Scanner {
     // Check for context length issues
     if (configText.includes('max_tokens') || configText.includes('context_length')) {
       const match = configText.match(/(?:max_tokens|context_length)["\s:]*(\d+)/);
-      if (match && parseInt(match[1]) > 100000) {
+      if (match && match[1] && parseInt(match[1]) > 100000) {
         vulnerabilities.push(this.createVulnerability(
           serverId,
           'excessive-context',
@@ -490,7 +490,7 @@ export class PromptInjectionScanner implements Scanner {
         hipaa: true,
         iso27001: true
       },
-      discoveredAt: new Date().toISOString()
+      discoveredAt: new Date()
     };
   }
 

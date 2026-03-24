@@ -17,7 +17,7 @@ const exampleConfigs: ClaudeDesktopConfig = {
       args: [
         "openai-server.js",
         "--api-key", 
-        "sk-1234567890abcdefghijklmnopqrstuvwxyz1234567890ab" // ⚠️ API key exposed
+        "sk-example-INSECURE-DO-NOT-USE-IN-PRODUCTION-000000" // ⚠️ Intentionally insecure for demo scanning
       ],
       metadata: {
         name: "OpenAI Integration",
@@ -30,7 +30,7 @@ const exampleConfigs: ClaudeDesktopConfig = {
       command: "node",
       args: ["database-server.js", "--port", "5432"],
       env: {
-        DATABASE_URL: "postgresql://admin:SuperSecret123@prod.db.com/production", // ⚠️ Credentials exposed
+        DATABASE_URL: "postgresql://admin:EXAMPLE_PASSWORD@db.example.com/demo", // ⚠️ Intentionally insecure for demo scanning
         SENSITIVE_DATA: "true"
       },
       // ⚠️ No auth configuration despite handling sensitive data

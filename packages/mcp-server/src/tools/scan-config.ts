@@ -1,4 +1,4 @@
-import { MCPGuard } from '@mcp-guard/core';
+import { MCPGuard, createStderrLogger, LogLevel } from '@mcp-guard/core';
 import type { MCPServerConfig, ScanResult } from '@mcp-guard/core';
 
 export interface ScanConfigArgs {
@@ -10,7 +10,8 @@ export class ScanConfigTool {
   private mcpGuard: MCPGuard;
 
   constructor() {
-    this.mcpGuard = new MCPGuard();
+    const logger = createStderrLogger(LogLevel.INFO);
+    this.mcpGuard = new MCPGuard({ logger });
   }
 
   async execute(args: ScanConfigArgs): Promise<ScanResult> {
@@ -71,7 +72,7 @@ export class ScanConfigTool {
         lines.push(`   Location: ${vuln.server}`);
         lines.push(`   ${vuln.description}`);
         if (vuln.remediation) {
-          lines.push(`   Fix: ${vuln.remediation.steps[0]}`);
+          lines.push(`   Fix: ${vuln.remediation.description}`);
         }
         lines.push('');
       });

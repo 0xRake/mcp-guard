@@ -7,8 +7,11 @@ import {
   ListToolsRequestSchema,
   Tool
 } from '@modelcontextprotocol/sdk/types.js';
-import mcpGuard from '@mcp-guard/core';
+import { MCPGuard, createStderrLogger, LogLevel } from '@mcp-guard/core';
 import type { ScanResult, MCPServerConfig } from '@mcp-guard/core';
+
+const logger = createStderrLogger(LogLevel.INFO);
+const mcpGuard = new MCPGuard({ logger });
 import { z } from 'zod';
 import { 
   scanConfigTool,
@@ -274,7 +277,8 @@ async function main() {
 
   // Handle tool execution
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+    const { name, arguments: toolArgs } = request.params;
+    const args = toolArgs || {};
 
     try {
       switch (name) {
@@ -283,7 +287,7 @@ async function main() {
             config: args.config as MCPServerConfig,
             depth: args.depth as any
           });
-          
+
           return {
             content: [{
               type: 'text',
@@ -297,7 +301,7 @@ async function main() {
             config: args.config as MCPServerConfig,
             types: args.types as string[]
           });
-          
+
           return {
             content: [{
               type: 'text',
@@ -312,12 +316,12 @@ async function main() {
             interval: args.interval as number,
             metrics: args.metrics as string[]
           });
-          
+
           // Set up anomaly listener
           monitorTrafficTool.on('anomaly-detected', (anomaly) => {
             console.error(`[ANOMALY] ${anomaly.message}`);
           });
-          
+
           return {
             content: [{
               type: 'text',
@@ -329,10 +333,10 @@ async function main() {
         case 'auto_fix': {
           const config = args.config as MCPServerConfig;
           const dryRun = args.dryRun as boolean || false;
-          
+
           const result = await mcpGuard.scan(
             { default: config },
-            { autoFix: !dryRun }
+            { depth: 'standard', autoFix: !dryRun }
           );
           
           const fixable = result.vulnerabilities.filter(v => v.remediation?.automated);

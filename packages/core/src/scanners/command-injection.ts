@@ -128,8 +128,8 @@ export class CommandInjectionScanner implements Scanner {
 
     // Check for shell metacharacters in arguments
     for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      
+      const arg = args[i]!;
+
       // Check for metacharacters
       for (const char of SHELL_METACHARACTERS) {
         if (arg.includes(char) && !this.isSafeUsage(arg, char)) {

@@ -3,49 +3,51 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Logger, LogLevel, ConfigLoader, ReportGenerator, ReportFormat } from '../src/utils';
+import { LogLevel, noopLogger, createStderrLogger, ConfigLoader, ReportGenerator, ReportFormat } from '../src/utils';
+import type { Logger } from '../src/utils';
 import { ConfigValidator, InputValidator } from '../src/validators';
 import type { ScanResult, MCPServerConfig } from '../src/types';
 
 describe('Logger', () => {
-  let logger: Logger;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Logger.resetInstance();
-    logger = Logger.getInstance();
-    logger.setLogLevel(LogLevel.INFO); // Reset to default
-    logger.setPrefix('[MCP-Guard]'); // Reset to default
-    // Mock console methods
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('noopLogger silently accepts all calls', () => {
+    expect(() => {
+      noopLogger.debug('test');
+      noopLogger.info('test');
+      noopLogger.warn('test');
+      noopLogger.error('test');
+    }).not.toThrow();
   });
 
-  it('should be a singleton', () => {
-    const logger1 = Logger.getInstance();
-    const logger2 = Logger.getInstance();
-    expect(logger1).toBe(logger2);
+  it('createStderrLogger respects log level', () => {
+    const writes: string[] = [];
+    const origWrite = process.stderr.write;
+    process.stderr.write = ((chunk: any) => { writes.push(String(chunk)); return true; }) as any;
+
+    const logger = createStderrLogger(LogLevel.WARN);
+    logger.debug('should not appear');
+    logger.info('should not appear');
+    logger.warn('should appear');
+    logger.error('should appear');
+
+    process.stderr.write = origWrite;
+
+    expect(writes.length).toBe(2);
+    expect(writes[0]).toContain('WARN');
+    expect(writes[1]).toContain('ERROR');
   });
 
-  it('should respect log levels', () => {
-    logger.setLogLevel(LogLevel.WARN);
-    
-    logger.debug('debug message');
-    expect(console.log).not.toHaveBeenCalled();
-    
-    logger.warn('warning message');
-    expect(console.warn).toHaveBeenCalled();
-  });
+  it('createStderrLogger includes prefix', () => {
+    const writes: string[] = [];
+    const origWrite = process.stderr.write;
+    process.stderr.write = ((chunk: any) => { writes.push(String(chunk)); return true; }) as any;
 
-  it('should format messages with prefix', () => {
-    logger.setPrefix('[TEST]');
-    logger.info('test message');
-    
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining('[TEST]'),
-      'test message'
-    );
+    const logger = createStderrLogger(LogLevel.INFO, '[test-prefix]');
+    logger.info('hello');
+
+    process.stderr.write = origWrite;
+
+    expect(writes[0]).toContain('[test-prefix]');
+    expect(writes[0]).toContain('hello');
   });
 });
 

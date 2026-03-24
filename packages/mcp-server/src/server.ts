@@ -22,7 +22,7 @@ import type { MCPServerConfig } from '@mcp-guard/core';
 // Parse command line arguments
 const args = process.argv.slice(2);
 const transportType = args.includes('--websocket') ? TransportType.WEBSOCKET : TransportType.STDIO;
-const port = args.includes('--port') ? parseInt(args[args.indexOf('--port') + 1]) : 8080;
+const port = args.includes('--port') ? parseInt(args[args.indexOf('--port') + 1] || '8080') : 8080;
 
 // Tool definitions with proper MCP schema
 const TOOLS: Tool[] = [
@@ -164,7 +164,8 @@ async function createMCPServer(): Promise<Server> {
 
   // Register tool execution handler
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+    const { name, arguments: toolArgs } = request.params;
+    const args = toolArgs || {};
 
     try {
       switch (name) {
@@ -173,7 +174,7 @@ async function createMCPServer(): Promise<Server> {
             config: args.config as MCPServerConfig,
             depth: args.depth as any
           });
-          
+
           return {
             content: [{
               type: 'text',
@@ -187,7 +188,7 @@ async function createMCPServer(): Promise<Server> {
             config: args.config as MCPServerConfig,
             types: args.types as string[]
           });
-          
+
           return {
             content: [{
               type: 'text',
@@ -202,15 +203,15 @@ async function createMCPServer(): Promise<Server> {
             interval: args.interval as number,
             metrics: args.metrics as string[]
           });
-          
+
           // Set up anomaly detection listener
           monitorTrafficTool.on('anomaly-detected', (anomaly) => {
             console.error(`[ANOMALY] ${anomaly.severity}: ${anomaly.message}`);
           });
-          
+
           // Get initial metrics
           const metrics = monitorTrafficTool.getMetrics(sessionId);
-          
+
           return {
             content: [{
               type: 'text',

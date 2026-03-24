@@ -532,9 +532,9 @@ export class ToolPoisoningScanner implements Scanner {
     
     while ((match = toolNamePattern.exec(configText)) !== null) {
       tools.push({
-        name: match[1],
+        name: match[1]!,
         description: 'Extracted from config',
-        dangerous: DANGEROUS_TOOL_NAMES.includes(match[1].toLowerCase())
+        dangerous: DANGEROUS_TOOL_NAMES.includes(match[1]!.toLowerCase())
       });
     }
     
@@ -581,26 +581,24 @@ export class ToolPoisoningScanner implements Scanner {
             let params = {};
             if (paramsMatch) {
               try {
-                params = JSON.parse(paramsMatch[1]);
+                params = JSON.parse(paramsMatch[1]!);
               } catch {
                 // If params parsing fails, check for common dangerous patterns
                 if (arg.includes('"command"') || arg.includes('"query"') || arg.includes('"path"')) {
-                  params = {
-                    command: arg.includes('"command"') ? { type: 'string' } : undefined,
-                    query: arg.includes('"query"') ? { type: 'string' } : undefined,
-                    path: arg.includes('"path"') ? { type: 'string' } : undefined
-                  };
-                  // Remove undefined entries
-                  Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+                  const dynamicParams: Record<string, unknown> = {};
+                  if (arg.includes('"command"')) dynamicParams['command'] = { type: 'string' };
+                  if (arg.includes('"query"')) dynamicParams['query'] = { type: 'string' };
+                  if (arg.includes('"path"')) dynamicParams['path'] = { type: 'string' };
+                  params = dynamicParams;
                 }
               }
             }
             
             tools.push({
-              name: jsonMatch[1],
+              name: jsonMatch[1]!,
               description: 'Extracted from JSON argument',
               parameters: params,
-              dangerous: DANGEROUS_TOOL_NAMES.includes(jsonMatch[1].toLowerCase())
+              dangerous: DANGEROUS_TOOL_NAMES.includes(jsonMatch[1]!.toLowerCase())
             });
           }
         }

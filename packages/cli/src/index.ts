@@ -7,8 +7,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import { glob } from 'glob';
 import PDFDocument from 'pdfkit';
-import mcpGuard, { ReportGenerator, ReportFormat, ConfigLoader } from '@mcp-guard/core';
-import type { ScanResult, Vulnerability, Severity, MCPServerConfig } from '@mcp-guard/core';
+import { MCPGuard, ReportGenerator, ReportFormat, ConfigLoader, createStderrLogger, LogLevel } from '@mcp-guard/core';
+import type { ScanResult, Vulnerability, Severity, MCPServerConfig, Logger } from '@mcp-guard/core';
 
 const program = new Command();
 
@@ -16,7 +16,7 @@ const program = new Command();
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));
 
 // Helper function to format severity with colors
-function formatSeverity(severity: Severity): string {
+function formatSeverity(severity: Severity | string): string {
   switch (severity) {
     case 'CRITICAL':
       return chalk.red.bold('CRITICAL');
@@ -57,8 +57,8 @@ function displayBanner() {
 }
 
 // Load configuration from file
-async function loadConfig(configPath: string): Promise<MCPServerConfig | Record<string, MCPServerConfig>> {
-  const spinner = ora('Loading configuration...').start();
+async function loadConfig(configPath: string, stream?: NodeJS.WritableStream): Promise<MCPServerConfig | Record<string, MCPServerConfig>> {
+  const spinner = ora({ text: 'Loading configuration...', stream: stream || process.stdout }).start();
   try {
     if (!await fs.pathExists(configPath)) {
       spinner.fail(`Configuration file not found: ${configPath}`);
@@ -216,7 +216,16 @@ async function generatePDFReport(result: ScanResult, outputPath: string): Promis
 program
   .name('mcp-guard')
   .description('Security scanner for Model Context Protocol servers')
-  .version(packageJson.version);
+  .version(packageJson.version)
+  .option('--debug', 'Enable debug logging');
+
+// Helper to create MCPGuard instance with optional debug logger
+function createGuard(): MCPGuard {
+  const logger = program.opts().debug
+    ? createStderrLogger(LogLevel.DEBUG)
+    : undefined;
+  return new MCPGuard({ logger });
+}
 
 // Scan command
 program
@@ -228,29 +237,33 @@ program
   .option('--depth <level>', 'Scan depth (quick, standard, comprehensive)', 'standard')
   .option('--exclude <types>', 'Exclude scanner types (comma-separated)')
   .action(async (configPath, options) => {
-    displayBanner();
-    
+    const structuredOutput = options.output !== 'console';
+
+    if (!structuredOutput) {
+      displayBanner();
+    }
+
     // Load configuration
-    const config = await loadConfig(configPath);
-    
+    const config = await loadConfig(configPath, structuredOutput ? process.stderr : undefined);
+
     // Prepare scan options
     const scanOptions: any = {
       depth: options.depth
     };
-    
+
     if (options.exclude) {
       scanOptions.excludeTypes = options.exclude.split(',').map((t: string) => t.trim());
     }
-    
-    // Run scan
-    const spinner = ora('Running security scan...').start();
-    
+
+    // Run scan — send spinner to stderr when piping structured output
+    const spinner = ora({ text: 'Running security scan...', stream: structuredOutput ? process.stderr : process.stdout }).start();
+
     try {
-      const result = await mcpGuard.scan(config, scanOptions);
+      const result = await createGuard().scan(config, scanOptions);
       spinner.succeed('Scan completed successfully');
-      
+
       // Handle output
-      if (options.output === 'console') {
+      if (!structuredOutput) {
         displayResults(result, options.verbose);
       } else {
         const formatMap: Record<string, ReportFormat> = {
@@ -300,7 +313,7 @@ program
     const spinner = ora('Scanning for vulnerabilities...').start();
     
     try {
-      const result = await mcpGuard.scan(config);
+      const result = await createGuard().scan(config);
       spinner.succeed(`Found ${result.summary.vulnerabilitiesFound} vulnerabilities`);
       
       if (result.summary.vulnerabilitiesFound === 0) {
@@ -420,7 +433,7 @@ program
     const spinner = ora('Generating security report...').start();
     
     try {
-      const result = await mcpGuard.scan(config);
+      const result = await createGuard().scan(config);
       spinner.succeed('Scan completed');
       
       // Determine format and output path
@@ -487,7 +500,7 @@ program
       const spinner = ora('Running security scan...').start();
       
       try {
-        const result = await mcpGuard.scan(config);
+        const result = await createGuard().scan(config);
         spinner.succeed(`Scan completed - Score: ${result.summary.score}/100`);
         
         if (result.summary.vulnerabilitiesFound > 0) {

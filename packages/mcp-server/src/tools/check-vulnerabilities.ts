@@ -1,4 +1,4 @@
-import { MCPGuard } from '@mcp-guard/core';
+import { MCPGuard, createStderrLogger, LogLevel } from '@mcp-guard/core';
 import type { MCPServerConfig, ScanResult, Vulnerability } from '@mcp-guard/core';
 
 export interface CheckVulnerabilitiesArgs {
@@ -24,7 +24,8 @@ export class CheckVulnerabilitiesChuiTool {
   ];
 
   constructor() {
-    this.mcpGuard = new MCPGuard();
+    const logger = createStderrLogger(LogLevel.INFO);
+    this.mcpGuard = new MCPGuard({ logger });
   }
 
   async execute(args: CheckVulnerabilitiesArgs): Promise<Vulnerability[]> {
@@ -49,10 +50,17 @@ export class CheckVulnerabilitiesChuiTool {
       }
     );
 
+    // When all types are requested, return unfiltered
+    if (types.length === this.validTypes.length) {
+      return result.vulnerabilities;
+    }
+
     // Filter vulnerabilities by requested types
+    // Vuln types from domains (e.g. EXPOSED_API_KEY) don't always match
+    // scanner names (e.g. api-keys), so check both directions
     return result.vulnerabilities.filter(vuln => {
       const vulnType = vuln.type.toLowerCase().replace(/_/g, '-');
-      return types.some(type => vulnType.includes(type));
+      return types.some(type => vulnType.includes(type) || type.includes(vulnType.split('-')[0]));
     });
   }
 

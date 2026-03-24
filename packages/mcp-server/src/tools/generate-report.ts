@@ -1,4 +1,4 @@
-import { MCPGuard } from '@mcp-guard/core';
+import { MCPGuard, createStderrLogger, LogLevel } from '@mcp-guard/core';
 import type { MCPServerConfig, ScanResult } from '@mcp-guard/core';
 
 export interface GenerateReportArgs {
@@ -12,7 +12,8 @@ export class GenerateReportTool {
   private mcpGuard: MCPGuard;
 
   constructor() {
-    this.mcpGuard = new MCPGuard();
+    const logger = createStderrLogger(LogLevel.INFO);
+    this.mcpGuard = new MCPGuard({ logger });
   }
 
   async execute(args: GenerateReportArgs): Promise<string> {
@@ -96,7 +97,7 @@ export class GenerateReportTool {
             if (includeRemediation && vuln.remediation) {
               lines.push('');
               lines.push('**Remediation:**');
-              vuln.remediation.steps.forEach(step => {
+              vuln.remediation.commands || [vuln.remediation.description].forEach(step => {
                 lines.push(`1. ${step}`);
               });
               if (vuln.remediation.automated) {
@@ -261,7 +262,7 @@ export class GenerateReportTool {
                 <div class="remediation">
                     <h4>Remediation Steps:</h4>
                     <ol>
-                        ${vuln.remediation.steps.map(step => `<li>${step}</li>`).join('')}
+                        ${vuln.remediation.commands || [vuln.remediation.description].map(step => `<li>${step}</li>`).join('')}
                     </ol>
                     ${vuln.remediation.automated ? '<p>✅ Automated fix available</p>' : ''}
                 </div>
@@ -326,7 +327,7 @@ export class GenerateReportTool {
           }],
           fixes: vuln.remediation ? [{
             description: {
-              text: vuln.remediation.steps.join('; ')
+              text: vuln.remediation.commands || [vuln.remediation.description].join('; ')
             }
           }] : undefined
         }))

@@ -9,16 +9,12 @@ import { logger } from '../utils/logger';
 
 // Zod schemas for validation
 const AuthConfigSchema = z.object({
-  type: z.enum(['basic', 'bearer', 'oauth', 'custom']),
-  credentials: z.record(z.string()).optional(),
-  token: z.string().optional(),
-  oauth: z.object({
-    clientId: z.string(),
-    clientSecret: z.string().optional(),
-    authorizationUrl: z.string().url().optional(),
-    tokenUrl: z.string().url().optional(),
-    scopes: z.array(z.string()).optional()
-  }).optional()
+  type: z.enum(['basic', 'bearer', 'apikey', 'custom']),
+  credentials: z.object({
+    username: z.string(),
+    password: z.string()
+  }).optional(),
+  token: z.string().optional()
 });
 
 const OAuthConfigSchema = z.object({
@@ -28,10 +24,12 @@ const OAuthConfigSchema = z.object({
   pkce: z.boolean().optional(),
   metadata: z.object({
     issuer: z.string(),
-    authorization_endpoint: z.string().url().optional(),
-    token_endpoint: z.string().url().optional(),
-    userinfo_endpoint: z.string().url().optional(),
-    jwks_uri: z.string().url().optional()
+    authorization_endpoint: z.string().url(),
+    token_endpoint: z.string().url(),
+    jwks_uri: z.string().url().optional(),
+    scopes_supported: z.array(z.string()).optional(),
+    response_types_supported: z.array(z.string()).optional(),
+    grant_types_supported: z.array(z.string()).optional()
   }).optional()
 });
 
@@ -39,7 +37,7 @@ const ServerCapabilitiesSchema = z.object({
   tools: z.boolean().optional(),
   prompts: z.boolean().optional(),
   resources: z.boolean().optional(),
-  logging: z.boolean().optional()
+  sampling: z.boolean().optional()
 });
 
 const ServerMetadataSchema = z.object({
@@ -165,12 +163,15 @@ export class ConfigValidator {
       if (sanitizedCreds.password) {
         sanitizedCreds.password = '[REDACTED]';
       }
-      if (sanitizedCreds.token) {
-        sanitizedCreds.token = '[REDACTED]';
-      }
       sanitized.auth = {
         ...sanitized.auth,
         credentials: sanitizedCreds
+      };
+    }
+    if (sanitized.auth?.token) {
+      sanitized.auth = {
+        ...sanitized.auth,
+        token: '[REDACTED]'
       };
     }
 
@@ -211,11 +212,15 @@ export class ConfigValidator {
 
     // Check for common secret patterns
     const secretPatterns = [
-      /^sk-[a-zA-Z0-9]{20,}$/,  // OpenAI style
-      /^[a-zA-Z0-9]{32,}$/,      // Generic long key
-      /^ghp_[a-zA-Z0-9]{36}$/,   // GitHub token
-      /^gho_[a-zA-Z0-9]{36}$/,   // GitHub OAuth
-      /^github_pat_[a-zA-Z0-9_]{82}$/ // GitHub PAT
+      /^sk-[a-zA-Z0-9]{20,}$/,            // OpenAI style
+      /^sk-ant-[a-zA-Z0-9]{20,}$/,        // Anthropic style
+      /^ghp_[a-zA-Z0-9]{36}$/,            // GitHub token
+      /^gho_[a-zA-Z0-9]{36}$/,            // GitHub OAuth
+      /^github_pat_[a-zA-Z0-9_]{82}$/,    // GitHub PAT
+      /^AKIA[0-9A-Z]{16}$/,               // AWS Access Key
+      /^sk_live_[a-zA-Z0-9]{24,}$/,       // Stripe Live Key
+      /^xoxb-[a-zA-Z0-9\-]+$/,            // Slack Bot Token
+      /^eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+$/ // JWT token
     ];
 
     return secretPatterns.some(pattern => pattern.test(value));

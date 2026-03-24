@@ -1,9 +1,16 @@
 /**
- * Logger utility for MCP-Guard
- * Provides colored console output and log levels
+ * Logger interface and factories for MCP-Guard.
+ *
+ * The library never writes to stdout/stderr directly.
+ * Consumers inject a Logger via MCPGuardOptions; the default is silent.
  */
 
-import chalk from 'chalk';
+export interface Logger {
+  debug(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
+}
 
 export enum LogLevel {
   DEBUG = 0,
@@ -13,91 +20,35 @@ export enum LogLevel {
   SILENT = 4
 }
 
-export class Logger {
-  private static instance: Logger;
-  private logLevel: LogLevel = LogLevel.INFO;
-  private prefix: string = '[MCP-Guard]';
+export const noopLogger: Logger = {
+  debug() {},
+  info() {},
+  warn() {},
+  error() {}
+};
 
-  private constructor() {}
-
-  static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger();
+/**
+ * Logger that writes to stderr. Safe for CLI tools and MCP servers
+ * where stdout is reserved for data or protocol messages.
+ */
+export function createStderrLogger(level: LogLevel = LogLevel.INFO, prefix = '[mcp-guard]'): Logger {
+  return {
+    debug(message, ...args) {
+      if (level <= LogLevel.DEBUG) process.stderr.write(`${prefix} DEBUG ${message} ${args.length ? JSON.stringify(args) : ''}\n`);
+    },
+    info(message, ...args) {
+      if (level <= LogLevel.INFO) process.stderr.write(`${prefix} INFO  ${message} ${args.length ? JSON.stringify(args) : ''}\n`);
+    },
+    warn(message, ...args) {
+      if (level <= LogLevel.WARN) process.stderr.write(`${prefix} WARN  ${message} ${args.length ? JSON.stringify(args) : ''}\n`);
+    },
+    error(message, ...args) {
+      if (level <= LogLevel.ERROR) process.stderr.write(`${prefix} ERROR ${message} ${args.length ? JSON.stringify(args) : ''}\n`);
     }
-    return Logger.instance;
-  }
-
-  static resetInstance(): void {
-    Logger.instance = undefined as any;
-  }
-
-  setLogLevel(level: LogLevel): void {
-    this.logLevel = level;
-  }
-
-  setPrefix(prefix: string): void {
-    this.prefix = prefix;
-  }
-
-  debug(message: string, ...args: any[]): void {
-    if (this.logLevel <= LogLevel.DEBUG) {
-      console.log(chalk.gray(`${this.prefix} [DEBUG]`), message, ...args);
-    }
-  }
-
-  info(message: string, ...args: any[]): void {
-    if (this.logLevel <= LogLevel.INFO) {
-      console.log(chalk.blue(`${this.prefix} [INFO]`), message, ...args);
-    }
-  }
-
-  success(message: string, ...args: any[]): void {
-    if (this.logLevel <= LogLevel.INFO) {
-      console.log(chalk.green(`${this.prefix} ✓`), message, ...args);
-    }
-  }
-
-  warn(message: string, ...args: any[]): void {
-    if (this.logLevel <= LogLevel.WARN) {
-      console.warn(chalk.yellow(`${this.prefix} [WARN]`), message, ...args);
-    }
-  }
-
-  error(message: string, ...args: any[]): void {
-    if (this.logLevel <= LogLevel.ERROR) {
-      console.error(chalk.red(`${this.prefix} [ERROR]`), message, ...args);
-    }
-  }
-
-  table(data: any): void {
-    if (this.logLevel <= LogLevel.INFO) {
-      console.table(data);
-    }
-  }
-
-  group(label: string): void {
-    if (this.logLevel <= LogLevel.INFO) {
-      console.group(chalk.cyan(`${this.prefix} ${label}`));
-    }
-  }
-
-  groupEnd(): void {
-    if (this.logLevel <= LogLevel.INFO) {
-      console.groupEnd();
-    }
-  }
-
-  time(label: string): void {
-    if (this.logLevel <= LogLevel.DEBUG) {
-      console.time(`${this.prefix} ${label}`);
-    }
-  }
-
-  timeEnd(label: string): void {
-    if (this.logLevel <= LogLevel.DEBUG) {
-      console.timeEnd(`${this.prefix} ${label}`);
-    }
-  }
+  };
 }
 
-export const logger = Logger.getInstance();
+// Backwards-compatible singleton — defaults to no-op.
+// Internal code that imported `logger` will now be silent unless
+// a consumer injects a real logger via MCPGuardOptions.
+export const logger: Logger = noopLogger;

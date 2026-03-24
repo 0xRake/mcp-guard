@@ -90,7 +90,7 @@ export class RateLimitingScanner implements Scanner {
       // Check rate limit values
       const rateLimitMatch = configText.match(/(?:rate|limit|throttle)[^\d]*(\d+)/);
       if (rateLimitMatch) {
-        const limit = parseInt(rateLimitMatch[1]);
+        const limit = parseInt(rateLimitMatch[1]!);
         
         // Check if limit is too high
         if (limit > 1000) {
@@ -422,7 +422,7 @@ export class RateLimitingScanner implements Scanner {
         hipaa: false,
         iso27001: true
       },
-      discoveredAt: new Date().toISOString()
+      discoveredAt: new Date()
     };
   }
 

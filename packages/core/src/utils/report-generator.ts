@@ -111,7 +111,7 @@ export class ReportGenerator {
         if (vuln.evidence) {
           lines.push('**Evidence:**');
           lines.push('```');
-          lines.push(vuln.evidence.value);
+          lines.push(vuln.evidence.value || '');
           lines.push('```');
           lines.push('');
         }
@@ -455,7 +455,7 @@ export class ReportGenerator {
       
       if (vuln.location) {
         lines.push('      <location>');
-        lines.push(`        <path>${escapeXml(vuln.location.path)}</path>`);
+        lines.push(`        <path>${escapeXml(vuln.location.path || '')}</path>`);
         if (vuln.location.line) {
           lines.push(`        <line>${vuln.location.line}</line>`);
         }

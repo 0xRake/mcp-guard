@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: ['src/index.ts', 'src/server.ts'],
   format: ['cjs', 'esm'],
-  dts: false, // Disable temporarily
+  dts: true,
   shims: true,
   skipNodeModulesBundle: true,
   clean: true,
