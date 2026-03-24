@@ -4,23 +4,119 @@ import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import websocket from '@fastify/websocket';
 import { MCPGuard } from '@mcp-guard/core';
-import type { Logger } from '@mcp-guard/core';
+import type { Logger, ScanResult } from '@mcp-guard/core';
 import { z } from 'zod';
+
+// ---------------------------------------------------------------------------
+// In-memory scan store — accumulates results from POST /api/scan
+// ---------------------------------------------------------------------------
+interface StoredScan {
+  result: ScanResult;
+  serverName: string;
+  storedAt: Date;
+}
+
+/** Registry of individual scanners available in @mcp-guard/core */
+const SCANNER_REGISTRY: { id: string; name: string; enabled: boolean }[] = [
+  { id: 'api-keys', name: 'API Keys Scanner', enabled: true },
+  { id: 'authentication', name: 'Authentication Scanner', enabled: true },
+  { id: 'command-injection', name: 'Command Injection Scanner', enabled: true },
+  { id: 'tool-poisoning', name: 'Tool Poisoning Scanner', enabled: true },
+  { id: 'data-exfiltration', name: 'Data Exfiltration Scanner', enabled: true },
+  { id: 'prompt-injection', name: 'Prompt Injection Scanner', enabled: true },
+  { id: 'oauth-security', name: 'OAuth Security Scanner', enabled: true },
+  { id: 'confused-deputy', name: 'Confused Deputy Scanner', enabled: true },
+  { id: 'rate-limiting', name: 'Rate Limiting Scanner', enabled: true },
+  { id: 'ssrf', name: 'SSRF Scanner', enabled: true },
+  { id: 'compliance', name: 'Compliance Scanner', enabled: true },
+];
+
+class ScanStore {
+  private scans: StoredScan[] = [];
+
+  add(result: ScanResult, serverName: string): void {
+    this.scans.push({ result, serverName, storedAt: new Date() });
+  }
+
+  getById(id: string): StoredScan | undefined {
+    return this.scans.find((s) => s.result.id === id);
+  }
+
+  all(): StoredScan[] {
+    return this.scans;
+  }
+
+  /** Count of scans whose timestamp falls on the given date (YYYY-MM-DD). */
+  countByDate(dateStr: string): number {
+    return this.scans.filter((s) => s.result.timestamp.toISOString().slice(0, 10) === dateStr)
+      .length;
+  }
+
+  /** Total vulnerabilities across all stored scans. */
+  totalVulnerabilities(): number {
+    return this.scans.reduce((sum, s) => sum + s.result.vulnerabilities.length, 0);
+  }
+
+  /** Count of CRITICAL severity findings across all stored scans. */
+  totalCritical(): number {
+    return this.scans.reduce(
+      (sum, s) => sum + s.result.vulnerabilities.filter((v) => v.severity === 'CRITICAL').length,
+      0,
+    );
+  }
+
+  /** Unique server names across all stored scans. */
+  uniqueServers(): number {
+    const servers = new Set(this.scans.map((s) => s.serverName));
+    return servers.size;
+  }
+
+  /** Average compliance score (summary.score) across all scans, or 100 if none. */
+  averageScore(): number {
+    if (this.scans.length === 0) return 100;
+    const total = this.scans.reduce((sum, s) => sum + s.result.summary.score, 0);
+    return Math.round(total / this.scans.length);
+  }
+
+  /** Returns daily scan/vulnerability counts for the last 7 days. */
+  dailyTrends(): { date: string; scans: number; vulnerabilities: number }[] {
+    const days: { date: string; scans: number; vulnerabilities: number }[] = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayscans = this.scans.filter(
+        (s) => s.result.timestamp.toISOString().slice(0, 10) === dateStr,
+      );
+      days.push({
+        date: dateStr,
+        scans: dayscans.length,
+        vulnerabilities: dayscans.reduce((sum, s) => sum + s.result.vulnerabilities.length, 0),
+      });
+    }
+    return days;
+  }
+}
 
 const ScanRequestSchema = z.object({
   config: z.any(),
-  options: z.object({
-    depth: z.enum(['quick', 'standard', 'comprehensive']).optional(),
-    excludeTypes: z.array(z.string()).optional(),
-    includeCompliance: z.boolean().optional()
-  }).optional()
+  options: z
+    .object({
+      depth: z.enum(['quick', 'standard', 'comprehensive']).optional(),
+      excludeTypes: z.array(z.string()).optional(),
+      includeCompliance: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const FixRequestSchema = z.object({
-  vulnerabilities: z.array(z.object({
-    id: z.string(),
-    automated: z.boolean()
-  }))
+  vulnerabilities: z.array(
+    z.object({
+      id: z.string(),
+      automated: z.boolean(),
+    }),
+  ),
 });
 
 export async function buildApp(opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
@@ -33,6 +129,7 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     error: (msg) => fastify.log.error(msg),
   };
   const mcpGuard = new MCPGuard({ logger });
+  const scanStore = new ScanStore();
 
   await fastify.register(cors, { origin: true, credentials: true });
 
@@ -41,17 +138,15 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
       info: {
         title: 'MCP-Guard API',
         description: 'Security scanning API for MCP servers',
-        version: '1.0.0'
+        version: '1.0.0',
       },
-      servers: [
-        { url: 'http://localhost:3001', description: 'Development server' }
-      ]
-    }
+      servers: [{ url: 'http://localhost:3001', description: 'Development server' }],
+    },
   });
 
   await fastify.register(swaggerUI, {
     routePrefix: '/docs',
-    uiConfig: { docExpansion: 'list', deepLinking: false }
+    uiConfig: { docExpansion: 'list', deepLinking: false },
   });
 
   await fastify.register(websocket);
@@ -61,127 +156,123 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
     return { status: 'healthy', timestamp: new Date().toISOString() };
   });
 
-  fastify.post('/api/scan', {
-    schema: {
-      body: {
-        type: 'object',
-        properties: {
-          config: { type: 'object' },
-          options: {
-            type: 'object',
-            properties: {
-              depth: { type: 'string', enum: ['quick', 'standard', 'comprehensive'] },
-              excludeTypes: { type: 'array', items: { type: 'string' } },
-              includeCompliance: { type: 'boolean' }
-            }
-          }
+  fastify.post(
+    '/api/scan',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            config: { type: 'object' },
+            options: {
+              type: 'object',
+              properties: {
+                depth: { type: 'string', enum: ['quick', 'standard', 'comprehensive'] },
+                excludeTypes: { type: 'array', items: { type: 'string' } },
+                includeCompliance: { type: 'boolean' },
+              },
+            },
+          },
+          required: ['config'],
         },
-        required: ['config']
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { config, options } = ScanRequestSchema.parse(request.body);
+
+        const result =
+          options?.depth === 'comprehensive'
+            ? await mcpGuard.comprehensiveScan(config)
+            : options?.depth === 'quick'
+              ? await mcpGuard.quickScan(config)
+              : await mcpGuard.scan(
+                  config,
+                  options ? ({ ...options, depth: options.depth || 'standard' } as any) : undefined,
+                );
+
+        // Store scan result for stats and history
+        const serverName = (config as any)?.metadata?.name ?? (config as any)?.command ?? 'unknown';
+        scanStore.add(result, serverName);
+
+        return { success: true, result };
+      } catch (error) {
+        return reply.code(400).send({
+          success: false,
+          error: error instanceof Error ? error.message : 'Scan failed',
+        });
       }
-    }
-  }, async (request, reply) => {
-    try {
-      const { config, options } = ScanRequestSchema.parse(request.body);
-
-      const result = options?.depth === 'comprehensive'
-        ? await mcpGuard.comprehensiveScan(config)
-        : options?.depth === 'quick'
-        ? await mcpGuard.quickScan(config)
-        : await mcpGuard.scan(config, options ? { ...options, depth: options.depth || 'standard' } as any : undefined);
-
-      return { success: true, result };
-    } catch (error) {
-      return reply.code(400).send({
-        success: false,
-        error: error instanceof Error ? error.message : 'Scan failed'
-      });
-    }
-  });
+    },
+  );
 
   fastify.get('/api/results/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    return {
-      id,
-      status: 'completed',
-      message: 'This endpoint will return stored scan results once database is integrated'
-    };
+    const stored = scanStore.getById(id);
+    if (stored) {
+      return { id, status: 'completed', result: stored.result };
+    }
+    return { id, status: 'not_found' };
   });
 
-  fastify.post('/api/fix', {
-    schema: {
-      body: {
-        type: 'object',
-        properties: {
-          vulnerabilities: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string' },
-                automated: { type: 'boolean' }
+  fastify.post(
+    '/api/fix',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            vulnerabilities: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  automated: { type: 'boolean' },
+                },
+                required: ['id'],
               },
-              required: ['id']
-            }
-          }
+            },
+          },
+          required: ['vulnerabilities'],
         },
-        required: ['vulnerabilities']
-      }
-    }
-  }, async (request, reply) => {
-    try {
-      const { vulnerabilities } = FixRequestSchema.parse(request.body);
-      const fixed = vulnerabilities.filter(v => v.automated);
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { vulnerabilities } = FixRequestSchema.parse(request.body);
+        const fixed = vulnerabilities.filter((v) => v.automated);
 
-      return {
-        success: true,
-        fixed: fixed.length,
-        total: vulnerabilities.length,
-        message: `Applied ${fixed.length} automated fixes`
-      };
-    } catch (error) {
-      return reply.code(400).send({
-        success: false,
-        error: error instanceof Error ? error.message : 'Fix failed'
-      });
-    }
-  });
+        return {
+          success: true,
+          fixed: fixed.length,
+          total: vulnerabilities.length,
+          message: `Applied ${fixed.length} automated fixes`,
+        };
+      } catch (error) {
+        return reply.code(400).send({
+          success: false,
+          error: error instanceof Error ? error.message : 'Fix failed',
+        });
+      }
+    },
+  );
 
   fastify.get('/api/stats', async () => {
+    const today = new Date().toISOString().slice(0, 10);
     return {
-      scansToday: 42,
-      vulnerabilitiesFound: 156,
-      criticalIssues: 12,
-      serversMonitored: 8,
-      complianceScore: 87,
+      scansToday: scanStore.countByDate(today),
+      vulnerabilitiesFound: scanStore.totalVulnerabilities(),
+      criticalIssues: scanStore.totalCritical(),
+      serversMonitored: scanStore.uniqueServers(),
+      complianceScore: scanStore.averageScore(),
       trends: {
-        daily: [
-          { date: '2025-08-28', scans: 35, vulnerabilities: 120 },
-          { date: '2025-08-29', scans: 40, vulnerabilities: 145 },
-          { date: '2025-08-30', scans: 38, vulnerabilities: 132 },
-          { date: '2025-08-31', scans: 42, vulnerabilities: 156 },
-          { date: '2025-09-01', scans: 39, vulnerabilities: 148 },
-          { date: '2025-09-02', scans: 42, vulnerabilities: 156 }
-        ]
-      }
+        daily: scanStore.dailyTrends(),
+      },
     };
   });
 
   fastify.get('/api/scanners', async () => {
-    return {
-      scanners: [
-        { id: 'api-keys', name: 'API Keys Scanner', enabled: true },
-        { id: 'authentication', name: 'Authentication Scanner', enabled: true },
-        { id: 'command-injection', name: 'Command Injection Scanner', enabled: true },
-        { id: 'tool-poisoning', name: 'Tool Poisoning Scanner', enabled: true },
-        { id: 'data-exfiltration', name: 'Data Exfiltration Scanner', enabled: true },
-        { id: 'prompt-injection', name: 'Prompt Injection Scanner', enabled: true },
-        { id: 'oauth-security', name: 'OAuth Security Scanner', enabled: true },
-        { id: 'confused-deputy', name: 'Confused Deputy Scanner', enabled: true },
-        { id: 'rate-limiting', name: 'Rate Limiting Scanner', enabled: true },
-        { id: 'ssrf', name: 'SSRF Scanner', enabled: true },
-        { id: 'compliance', name: 'Compliance Scanner', enabled: true }
-      ]
-    };
+    return { scanners: SCANNER_REGISTRY };
   });
 
   fastify.register(async function (fastify) {
@@ -191,18 +282,20 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
 
         if (data.type === 'subscribe') {
           const interval = setInterval(() => {
-            socket.send(JSON.stringify({
-              type: 'update',
-              data: {
-                timestamp: new Date().toISOString(),
-                activeScans: Math.floor(Math.random() * 5),
-                recentVulnerability: {
-                  severity: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'][Math.floor(Math.random() * 4)],
-                  scanner: 'api-keys',
-                  server: 'server-' + Math.floor(Math.random() * 10)
-                }
-              }
-            }));
+            socket.send(
+              JSON.stringify({
+                type: 'update',
+                data: {
+                  timestamp: new Date().toISOString(),
+                  activeScans: Math.floor(Math.random() * 5),
+                  recentVulnerability: {
+                    severity: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'][Math.floor(Math.random() * 4)],
+                    scanner: 'api-keys',
+                    server: 'server-' + Math.floor(Math.random() * 10),
+                  },
+                },
+              }),
+            );
           }, 5000);
 
           socket.on('close', () => {
@@ -211,10 +304,12 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
         }
       });
 
-      socket.send(JSON.stringify({
-        type: 'connected',
-        message: 'Connected to MCP-Guard WebSocket'
-      }));
+      socket.send(
+        JSON.stringify({
+          type: 'connected',
+          message: 'Connected to MCP-Guard WebSocket',
+        }),
+      );
     });
   });
 
@@ -234,7 +329,8 @@ const start = async () => {
   }
 };
 
-const isMainModule = require.main === module ||
+const isMainModule =
+  require.main === module ||
   process.argv[1]?.endsWith('/api/dist/index.js') ||
   process.argv[1]?.endsWith('/api/src/index.ts');
 

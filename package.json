@@ -13,19 +13,34 @@
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "eslint packages/core/src packages/cli/src packages/api/src packages/mcp-server/src",
+    "lint:fix": "eslint --fix packages/core/src packages/cli/src packages/api/src packages/mcp-server/src",
+    "format": "prettier --write 'packages/*/src/**/*.ts'",
+    "format:check": "prettier --check 'packages/*/src/**/*.ts'",
     "clean": "turbo run clean && rm -rf node_modules",
     "typecheck": "turbo run typecheck",
     "cli": "pnpm --filter @mcp-guard/cli run start",
     "server": "pnpm --filter @mcp-guard/server run start",
     "web": "pnpm --filter @mcp-guard/web run dev",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
     "@types/node": "^20.11.0",
+    "eslint": "^9",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1",
     "turbo": "^1.12.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.57.2"
+  },
+  "lint-staged": {
+    "packages/*/src/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "packageManager": "pnpm@8.15.0",
   "workspaces": [

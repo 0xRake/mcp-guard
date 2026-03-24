@@ -1,5 +1,10 @@
 # MCP-Guard
 
+[![CI](https://github.com/0xRake/mcp-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/0xRake/mcp-guard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
+
 Security scanner for MCP server configs. Catches hardcoded API keys, command injection vectors, auth misconfigurations, SSRF, and compliance gaps before they hit production.
 
 ```bash
