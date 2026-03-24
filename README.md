@@ -8,8 +8,8 @@
 Security scanner for MCP server configs. Catches hardcoded API keys, command injection vectors, auth misconfigurations, SSRF, and compliance gaps before they hit production.
 
 ```bash
-pnpm add -g @mcp-guard/cli
-mcp-guard scan claude_desktop_config.json
+pnpm build
+node packages/cli/dist/index.js scan mcp-config.json
 ```
 
 That's it. You get a score (0-100), a grade, and a list of everything wrong.
@@ -34,8 +34,8 @@ Add MCP-Guard as an MCP server so Claude can scan configs for you:
 {
   "mcpServers": {
     "mcp-guard": {
-      "command": "npx",
-      "args": ["@mcp-guard/mcp-server"]
+      "command": "node",
+      "args": ["/path/to/mcp-guard/packages/mcp-server/dist/index.js"]
     }
   }
 }
@@ -44,6 +44,8 @@ Add MCP-Guard as an MCP server so Claude can scan configs for you:
 This gives Claude access to `scan_config`, `check_vulnerabilities`, `monitor_traffic`, and `generate_report` tools.
 
 ## CLI
+
+After building, run via `node packages/cli/dist/index.js` or link globally with `pnpm cli`:
 
 ```bash
 mcp-guard scan config.json                          # standard scan
@@ -121,11 +123,11 @@ GET  /docs        -- Swagger UI
 ## Development
 
 ```bash
-git clone https://github.com/0xrake/mcp-guard.git
+git clone https://github.com/0xRake/mcp-guard.git
 cd mcp-guard
 pnpm install
 pnpm build
-pnpm test    # 355 tests
+pnpm test    # 438 tests
 ```
 
 Monorepo managed with pnpm workspaces and Turborepo. Each package builds with tsup.

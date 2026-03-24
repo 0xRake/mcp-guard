@@ -20,7 +20,7 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "typecheck": "turbo run typecheck",
     "cli": "pnpm --filter @mcp-guard/cli run start",
-    "server": "pnpm --filter @mcp-guard/server run start",
+    "server": "pnpm --filter @mcp-guard/api run start",
     "web": "pnpm --filter @mcp-guard/web run dev",
     "release": "changeset publish",
     "prepare": "husky"
