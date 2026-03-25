@@ -26,6 +26,19 @@ MCP-Guard scans your config JSON and flags:
 
 Everything runs locally. Nothing leaves your machine.
 
+## What it fixes
+
+`mcp-guard fix` goes beyond reporting -- it interactively hardens your config:
+
+- **Secrets** -- extracts hardcoded API keys, tokens, and passwords into `${ENV_VAR}` placeholders and tells you what env vars to set.
+- **File permissions** -- detects config files readable by other users and `chmod 600`s them. Scans Claude Desktop, Claude Code, Cursor, VS Code, and Windsurf config locations.
+- **Tool restrictions** -- generates `permissions.deny` rules in your Claude Code `settings.json` to block dangerous MCP tool patterns (shell exec, file delete, etc.).
+- **Git safety** -- adds config files containing secrets to `.gitignore`.
+- **Config hygiene** -- warns about configs at silently-ignored paths (e.g. `~/.claude/mcp.json` which Claude Code doesn't load).
+- **Transport** -- flags deprecated SSE transport and recommends Streamable HTTP.
+
+Every fix is presented as a checkbox -- you pick what to apply. Use `--dry-run` to preview, `--auto` to apply all, or `--backup` to snapshot before changes.
+
 ## Use with Claude Desktop
 
 Add MCP-Guard as an MCP server so Claude can scan configs for you:
@@ -51,9 +64,11 @@ After building, run via `node packages/cli/dist/index.js` or link globally with 
 mcp-guard scan config.json                          # standard scan
 mcp-guard scan config.json --depth comprehensive    # deep scan
 mcp-guard scan config.json -o sarif -f results.sarif  # SARIF output for GitHub
-mcp-guard fix config.json --dry-run                 # preview fixes
+mcp-guard fix config.json                           # interactive security hardening
+mcp-guard fix config.json --dry-run                 # preview what would change
 mcp-guard watch config.json -i 30                   # rescan every 30s on file change
 mcp-guard report config.json --format pdf --output report.pdf
+mcp-guard dashboard config.json                     # interactive TUI with scan + fix
 mcp-guard init                                      # generate example config
 mcp-guard list                                      # show available scanners
 ```
