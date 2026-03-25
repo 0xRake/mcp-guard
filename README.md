@@ -89,9 +89,9 @@ const result = await guard.scan({
   env: { DATABASE_URL: 'postgres://admin:pass@localhost/db' }
 });
 
-console.log(result.summary.score);  // 35
+console.log(result.summary.score);  // 0
 console.log(result.summary.grade);  // "F"
-console.log(result.vulnerabilities.length);  // 3
+console.log(result.vulnerabilities.length);  // 9
 ```
 
 Works with single configs or the full Claude Desktop format (`{ mcpServers: { ... } }`).
