@@ -1,5 +1,13 @@
 # CLI Reference
 
+## Global Options
+
+| Flag | Description |
+|------|-------------|
+| `-V, --version` | Print version |
+| `--debug` | Enable debug logging |
+| `-h, --help` | Show help |
+
 ## Commands
 
 ### `mcp-guard scan <config>`
@@ -9,13 +17,15 @@ Run a security scan against an MCP server config file.
 ```bash
 mcp-guard scan config.json
 mcp-guard scan ~/.config/claude/claude_desktop_config.json
+mcp-guard scan config.json --depth comprehensive -v
+mcp-guard scan config.json -o sarif -f results.sarif
 ```
 
 **Options:**
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-v, --verbose` | Show all vulnerabilities (default caps at 10) | off |
+| `-v, --verbose` | Show detailed output | off |
 | `-o, --output <format>` | Output format: `json`, `markdown`, `html`, `sarif`, `csv`, `xml` | `console` |
 | `-f, --file <path>` | Write output to a file instead of stdout | -- |
 | `--depth <level>` | Scan depth: `quick`, `standard`, `comprehensive` | `standard` |
@@ -27,21 +37,34 @@ The config file can be plain JSON or a Claude Desktop config with `mcpServers`. 
 
 ### `mcp-guard fix <config>`
 
-Scan, then apply automated fixes to the config file.
+Interactive security hardening for MCP configurations. Scans for vulnerabilities and environmental issues, then presents a categorized hardening plan. Fixes are selected interactively (or all at once with `--auto`).
 
 ```bash
-mcp-guard fix config.json --dry-run   # see what would change
-mcp-guard fix config.json --backup    # fix and save a .backup copy
-mcp-guard fix config.json --auto      # skip the confirmation prompt
+mcp-guard fix config.json                # interactive — pick fixes from a checklist
+mcp-guard fix config.json --dry-run      # preview the hardening plan without writing anything
+mcp-guard fix config.json --backup       # create a timestamped backup before applying
+mcp-guard fix config.json --auto         # apply all recommended fixes without prompting
 ```
+
+**Options:**
 
 | Flag | Description |
 |------|-------------|
-| `--dry-run` | Preview fixes without writing anything |
-| `--auto` | Don't prompt for confirmation |
-| `--backup` | Save a timestamped backup before modifying |
+| `--auto` | Apply all recommended fixes without prompting |
+| `--dry-run` | Show the hardening plan without making changes |
+| `--backup` | Save a timestamped `.backup.<timestamp>` copy before modifying |
 
-Only vulnerabilities marked as auto-fixable get touched. The rest show up as "manual remediation required."
+**Fix categories:**
+
+| Category | What it does |
+|----------|-------------|
+| Secrets & Credentials | Replaces hardcoded API keys and passwords with `${ENV_VAR}` placeholders. Prints the `export` commands you need to set afterwards. |
+| File Permissions | Sets `chmod 600` on config files that contain secrets. Scans 11 known MCP config locations (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf) beyond the target file. |
+| Tool Restrictions | Generates `permissions.deny` rules in Claude Code `settings.json` to block dangerous tool patterns (`shell_exec`, `run_command`, `execute`, `rm`, `delete`, `write_file`). |
+| Config Hygiene | Detects configs at silently-ignored paths (e.g., `~/.claude/mcp.json` instead of `~/.claude.json`). Adds secret-containing config filenames to `.gitignore`. |
+| Transport Security | Flags servers using deprecated SSE transport (deprecated since March 2025) and recommends migration to Streamable HTTP. |
+
+Fixes that cannot be applied automatically are reported as manual steps at the end of the run.
 
 ### `mcp-guard report <config>`
 
@@ -50,6 +73,7 @@ Generate a formatted report from a scan.
 ```bash
 mcp-guard report config.json --format html --output report.html
 mcp-guard report config.json --pdf report.pdf
+mcp-guard report config.json --format sarif --output results.sarif
 ```
 
 | Flag | Description | Default |
@@ -75,6 +99,28 @@ mcp-guard watch config.json -i 30          # every 30 seconds
 
 File changes trigger an immediate rescan (debounced to 5s). Ctrl+C to stop.
 
+### `mcp-guard dashboard <config>`
+
+Interactive terminal dashboard. Displays a score visualization with severity counts, then provides a menu-driven interface for browsing and acting on vulnerabilities.
+
+```bash
+mcp-guard dashboard config.json
+mcp-guard dashboard config.json -d comprehensive
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-d, --depth <level>` | Scan depth: `quick`, `standard`, `comprehensive` | `standard` |
+
+**Dashboard features:**
+
+- Score and grade display with visual bar
+- Severity breakdown (CRITICAL / HIGH / MEDIUM / LOW / INFO)
+- Filter vulnerabilities by severity level
+- Paginated vulnerability browser with drill-down details
+- Inline fix for auto-fixable vulnerabilities
+- Rescan without leaving the dashboard
+
 ### `mcp-guard list`
 
 Show available scanners and their status.
@@ -83,7 +129,7 @@ Show available scanners and their status.
 mcp-guard list
 ```
 
-Prints a table of all scanner domains with enabled/coming-soon status.
+Prints a table of all 11 scanner domains with enabled/coming-soon status.
 
 ### `mcp-guard init`
 
