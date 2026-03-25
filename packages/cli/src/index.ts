@@ -328,9 +328,18 @@ program
   .option('--auto', 'Apply all recommended fixes without prompting')
   .option('--dry-run', 'Show what would be fixed without making changes')
   .option('--backup', 'Create backup before fixing')
+  .option('--scan-home', 'Expand scan scope to include $HOME config directories')
   .action(async (configPath, options) => {
     displayBanner();
     const { default: inquirer } = await import('inquirer');
+
+    const home = process.env.HOME || '';
+    const sandboxRoot = options.scanHome ? home : path.dirname(path.resolve(configPath));
+
+    console.log(
+      chalk.gray(`Scope: ${sandboxRoot} (use --scan-home to include ~/.claude, ~/.cursor, etc.)`),
+    );
+    console.log();
 
     const config = await loadConfig(configPath);
 
@@ -340,7 +349,7 @@ program
       spinner.succeed(`Found ${result.summary.vulnerabilitiesFound} vulnerabilities`);
 
       // Build fix proposals from scan + environment analysis
-      const proposals = await buildFixProposals(configPath, config, result);
+      const proposals = await buildFixProposals(configPath, config, result, sandboxRoot);
 
       if (proposals.length === 0) {
         console.log(chalk.green('\nNo issues found. Configuration looks secure.'));
@@ -373,38 +382,13 @@ program
         console.log(chalk.gray(`Backup: ${backupPath}`));
       }
 
-      // Select fixes
-      let selected: FixProposal[];
-      if (options.auto) {
-        selected = proposals;
-      } else {
-        const { picks } = await inquirer.prompt([
-          {
-            type: 'checkbox',
-            name: 'picks',
-            message: 'Select fixes to apply:',
-            choices: proposals.map((p, i) => ({
-              name: `${formatSeverity(p.severity)} ${p.description}`,
-              value: i,
-              checked: p.severity === 'CRITICAL' || p.severity === 'HIGH',
-            })),
-            pageSize: 20,
-          },
-        ]);
-        selected = picks
-          .map((i: number) => proposals[i])
-          .filter((p: FixProposal | undefined): p is FixProposal => p !== undefined);
-      }
-
-      if (selected.length === 0) {
-        console.log('No fixes selected.');
-        process.exit(0);
-      }
-
-      // Apply selected fixes
-      const applySpinner = ora('Applying fixes...').start();
-      const results = await executeFixProposals(selected, configPath, config);
-      applySpinner.succeed(`Applied ${results.applied} of ${results.total} fixes`);
+      // Apply fixes with per-action consent
+      const skipConsent = options.auto || options.dryRun;
+      const results = await executeFixProposals(proposals, configPath, config, {
+        requireConsent: !skipConsent,
+        sandboxRoot,
+      });
+      console.log(chalk.bold(`\nApplied ${results.applied} of ${results.total} fixes`));
 
       if (results.envVars.length > 0) {
         console.log(
@@ -449,6 +433,11 @@ interface FixOutcome {
   manualStep?: string;
 }
 
+interface FixExecutionOptions {
+  requireConsent?: boolean;
+  sandboxRoot?: string;
+}
+
 function categoryLabel(cat: FixCategory): string {
   const labels: Record<FixCategory, string> = {
     secrets: 'Secrets & Credentials',
@@ -461,9 +450,9 @@ function categoryLabel(cat: FixCategory): string {
 }
 
 // Known MCP config locations to discover and harden
-function discoverConfigPaths(): Array<{ path: string; label: string }> {
+function discoverConfigPaths(sandboxRoot?: string): Array<{ path: string; label: string }> {
   const home = process.env.HOME || '';
-  return [
+  const allPaths = [
     {
       path: path.join(
         home,
@@ -488,6 +477,14 @@ function discoverConfigPaths(): Array<{ path: string; label: string }> {
     { path: path.resolve('.vscode', 'mcp.json'), label: 'VS Code / Copilot' },
     { path: path.join(home, '.codeium', 'windsurf', 'mcp_config.json'), label: 'Windsurf' },
   ];
+
+  if (!sandboxRoot) return allPaths;
+
+  const resolved = path.resolve(sandboxRoot);
+  return allPaths.filter((entry) => {
+    const entryResolved = path.resolve(entry.path);
+    return entryResolved.startsWith(resolved + path.sep) || entryResolved === resolved;
+  });
 }
 
 // Configs at silently-ignored paths
@@ -511,7 +508,9 @@ async function buildFixProposals(
   configPath: string,
   config: MCPServerConfig | Record<string, MCPServerConfig>,
   result: ScanResult,
+  sandboxRoot?: string,
 ): Promise<FixProposal[]> {
+  const effectiveSandbox = sandboxRoot || path.dirname(path.resolve(configPath));
   const proposals: FixProposal[] = [];
 
   // ── 1. Secrets: extract hardcoded values to env vars ───────────────────
@@ -580,7 +579,7 @@ async function buildFixProposals(
   }
 
   // Check other discovered config files
-  for (const { path: cfgPath, label } of discoverConfigPaths()) {
+  for (const { path: cfgPath, label } of discoverConfigPaths(effectiveSandbox)) {
     if (cfgPath === resolvedPath) continue;
     try {
       if (await fs.pathExists(cfgPath)) {
@@ -749,17 +748,50 @@ async function executeFixProposals(
   proposals: FixProposal[],
   configPath: string,
   config: MCPServerConfig | Record<string, MCPServerConfig>,
+  options?: FixExecutionOptions,
 ): Promise<{
   applied: number;
   total: number;
   envVars: Array<{ name: string; placeholder: string }>;
   manualSteps: string[];
 }> {
+  const requireConsent = options?.requireConsent !== false;
   let applied = 0;
   const envVars: Array<{ name: string; placeholder: string }> = [];
   const manualSteps: string[] = [];
+  let applyAll = false;
 
-  for (const proposal of proposals) {
+  for (let i = 0; i < proposals.length; i++) {
+    const proposal = proposals[i]!;
+
+    if (requireConsent && !applyAll) {
+      console.log(
+        `\n  [${i + 1}/${proposals.length}] ${formatSeverity(proposal.severity)}: ${proposal.description}`,
+      );
+      if (proposal.detail) {
+        console.log(`        Action: ${proposal.detail}`);
+      }
+
+      const { default: inquirer } = await import('inquirer');
+      const { consent } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'consent',
+          message: 'Proceed?',
+          choices: [
+            { name: 'y  — apply this fix', value: 'y' },
+            { name: 'n  — skip this fix', value: 'n' },
+            { name: 'all — apply this and all remaining', value: 'all' },
+            { name: 'skip — skip this and all remaining', value: 'skip' },
+          ],
+        },
+      ]);
+
+      if (consent === 'skip') break;
+      if (consent === 'n') continue;
+      if (consent === 'all') applyAll = true;
+    }
+
     try {
       const outcome = await proposal.apply();
       if (outcome.applied) {
@@ -1123,7 +1155,13 @@ program
         running = false;
       } else if (action === 'fix-all') {
         const freshConfig = await loadConfig(configPath, process.stderr);
-        const proposals = await buildFixProposals(configPath, freshConfig, result);
+        const dashboardSandbox = path.dirname(path.resolve(configPath));
+        const proposals = await buildFixProposals(
+          configPath,
+          freshConfig,
+          result,
+          dashboardSandbox,
+        );
 
         if (proposals.length === 0) {
           console.log(chalk.green('\n  No fixable issues found.'));
@@ -1131,26 +1169,13 @@ program
           continue;
         }
 
-        // Let user pick which fixes to apply
-        const { picks } = await inquirer.prompt([
-          {
-            type: 'checkbox',
-            name: 'picks',
-            message: 'Select fixes to apply:',
-            choices: proposals.map((p, i) => ({
-              name: `${formatSeverity(p.severity)} ${p.description}`,
-              value: i,
-              checked: p.severity === 'CRITICAL' || p.severity === 'HIGH',
-            })),
-            pageSize: 15,
-          },
-        ]);
+        console.log(chalk.gray(`\n  Scope: ${dashboardSandbox}\n`));
 
-        const selected = (picks as number[])
-          .map((i) => proposals[i])
-          .filter((p): p is FixProposal => p !== undefined);
-        if (selected.length > 0) {
-          const fixResults = await executeFixProposals(selected, configPath, freshConfig);
+        if (proposals.length > 0) {
+          const fixResults = await executeFixProposals(proposals, configPath, freshConfig, {
+            requireConsent: true,
+            sandboxRoot: dashboardSandbox,
+          });
           console.log(
             chalk.green(`\n  Applied ${fixResults.applied} of ${fixResults.total} fixes`),
           );
@@ -1168,7 +1193,7 @@ program
         await waitForKey(inquirer);
 
         // Auto-rescan after fix
-        if (selected.length > 0) {
+        if (proposals.length > 0) {
           const rescanSpinner = ora('Rescanning...').start();
           try {
             const updatedConfig = await loadConfig(configPath, process.stderr);
@@ -1453,9 +1478,13 @@ async function showVulnDetail(
       recommendations: [],
       metadata: { scanner: 'mcp-guard', version: '1.0.0', signatures: '', rules: 0 },
     };
-    const proposals = await buildFixProposals(configPath, config, miniResult);
+    const detailSandbox = path.dirname(path.resolve(configPath));
+    const proposals = await buildFixProposals(configPath, config, miniResult, detailSandbox);
     if (proposals.length > 0) {
-      const fixResult = await executeFixProposals(proposals, configPath, config);
+      const fixResult = await executeFixProposals(proposals, configPath, config, {
+        requireConsent: true,
+        sandboxRoot: detailSandbox,
+      });
       if (fixResult.applied > 0) {
         console.log(chalk.green('\n  Fixed. Rescan to verify.'));
       }

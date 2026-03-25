@@ -103,36 +103,72 @@ describe('MCP-Guard API', () => {
   });
 
   describe('POST /api/fix', () => {
-    it('counts automated vs manual fixes correctly', async () => {
+    it('returns proposals, summary, and scanResult for a config', async () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/fix',
         payload: {
-          vulnerabilities: [
-            { id: 'v1', automated: true },
-            { id: 'v2', automated: true },
-            { id: 'v3', automated: false }
-          ]
+          config: {
+            command: 'node',
+            args: ['server.js'],
+            metadata: { name: 'test-server' }
+          }
         }
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.fixed).toBe(2);
-      expect(body.total).toBe(3);
-      expect(body.message).toContain('2');
+      expect(body.success).toBe(true);
+      expect(body.proposals).toBeInstanceOf(Array);
+      expect(body.summary).toHaveProperty('total');
+      expect(body.summary).toHaveProperty('automated');
+      expect(body.summary).toHaveProperty('manual');
+      expect(body.summary.total).toBe(body.proposals.length);
+      expect(body.summary.automated + body.summary.manual).toBe(body.summary.total);
+      expect(body.scanResult).toBeDefined();
+      expect(body.scanResult.vulnerabilities).toBeInstanceOf(Array);
     });
 
-    it('handles an empty vulnerabilities array', async () => {
+    it('produces a secrets proposal for a config with a hardcoded API key', async () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/fix',
-        payload: { vulnerabilities: [] }
+        payload: {
+          config: {
+            command: 'node',
+            args: ['server.js', '--api-key', 'sk-1234567890abcdefghijklmnopqrstuvwxyz1234567890ab'],
+            metadata: { name: 'leaky-server' }
+          }
+        }
       });
       expect(res.statusCode).toBe(200);
-      expect(res.json().fixed).toBe(0);
+      const body = res.json();
+      expect(body.success).toBe(true);
+      const secretsProposals = body.proposals.filter((p: any) => p.category === 'secrets');
+      expect(secretsProposals.length).toBeGreaterThan(0);
+      expect(secretsProposals[0].automated).toBe(true);
     });
 
-    it('rejects requests missing vulnerabilities field', async () => {
+    it('returns no secrets proposals for a config without hardcoded keys', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/fix',
+        payload: {
+          config: {
+            command: 'node',
+            args: ['server.js'],
+            metadata: { name: 'clean-server' }
+          }
+        }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.success).toBe(true);
+      const secretsProposals = body.proposals.filter((p: any) => p.category === 'secrets');
+      expect(secretsProposals.length).toBe(0);
+      expect(body.summary.total).toBe(body.proposals.length);
+    });
+
+    it('rejects requests missing the config field', async () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/fix',

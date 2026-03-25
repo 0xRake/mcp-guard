@@ -4,7 +4,7 @@ import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
 import websocket from '@fastify/websocket';
 import { MCPGuard } from '@mcp-guard/core';
-import type { Logger, ScanResult } from '@mcp-guard/core';
+import type { Logger, ScanResult, Vulnerability } from '@mcp-guard/core';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -111,13 +111,88 @@ const ScanRequestSchema = z.object({
 });
 
 const FixRequestSchema = z.object({
-  vulnerabilities: z.array(
-    z.object({
-      id: z.string(),
-      automated: z.boolean(),
-    }),
-  ),
+  config: z.any(),
+  apply: z.boolean().optional(),
 });
+
+// ---- Fix proposal generation ------------------------------------------------
+
+interface FixProposal {
+  category: 'secrets' | 'permissions' | 'tools' | 'transport' | 'hygiene';
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+  description: string;
+  detail: string;
+  automated: boolean;
+}
+
+const TRANSPORT_VULN_TYPES = new Set(['INSECURE_TRANSMISSION', 'CORS_MISCONFIGURATION']);
+
+function buildProposals(vulnerabilities: Vulnerability[]): FixProposal[] {
+  const proposals: FixProposal[] = [];
+  const handled = new Set<string>();
+
+  for (const vuln of vulnerabilities) {
+    // Exposed API keys — propose env-var extraction
+    if (vuln.type === 'EXPOSED_API_KEY') {
+      const locationHint = vuln.location?.path ?? vuln.server;
+      proposals.push({
+        category: 'secrets',
+        severity: vuln.severity as FixProposal['severity'],
+        description: `Replace hardcoded secret at ${locationHint}`,
+        detail: 'Current value will be replaced with ${ENV_VAR} placeholder',
+        automated: true,
+      });
+      handled.add(vuln.id);
+      continue;
+    }
+
+    // Auth hardening
+    if (vuln.type === 'MISSING_AUTHENTICATION' || vuln.type === 'WEAK_AUTHENTICATION') {
+      proposals.push({
+        category: 'tools',
+        severity: vuln.severity as FixProposal['severity'],
+        description: `Harden authentication for ${vuln.server}`,
+        detail: vuln.remediation.description,
+        automated: false,
+      });
+      handled.add(vuln.id);
+      continue;
+    }
+
+    // Transport / SSE-related issues
+    if (
+      TRANSPORT_VULN_TYPES.has(vuln.type) ||
+      vuln.title.toLowerCase().includes('sse') ||
+      vuln.description.toLowerCase().includes('sse')
+    ) {
+      proposals.push({
+        category: 'transport',
+        severity: vuln.severity as FixProposal['severity'],
+        description: `Migrate transport for ${vuln.server}`,
+        detail: vuln.remediation.description,
+        automated: false,
+      });
+      handled.add(vuln.id);
+      continue;
+    }
+  }
+
+  // Remaining vulnerabilities with automated remediation
+  for (const vuln of vulnerabilities) {
+    if (handled.has(vuln.id)) continue;
+    if (!vuln.remediation.automated) continue;
+
+    proposals.push({
+      category: 'hygiene',
+      severity: vuln.severity as FixProposal['severity'],
+      description: vuln.title,
+      detail: vuln.remediation.description,
+      automated: true,
+    });
+  }
+
+  return proposals;
+}
 
 export async function buildApp(opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: opts.logger ?? true });
@@ -221,32 +296,38 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
         body: {
           type: 'object',
           properties: {
-            vulnerabilities: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
-                  automated: { type: 'boolean' },
-                },
-                required: ['id'],
-              },
-            },
+            config: { type: 'object' },
+            apply: { type: 'boolean' },
           },
-          required: ['vulnerabilities'],
+          required: ['config'],
         },
       },
     },
     async (request, reply) => {
       try {
-        const { vulnerabilities } = FixRequestSchema.parse(request.body);
-        const fixed = vulnerabilities.filter((v) => v.automated);
+        const { config } = FixRequestSchema.parse(request.body);
+
+        if (!config) {
+          return reply.code(400).send({
+            success: false,
+            error: 'config is required',
+          });
+        }
+
+        const scanResult = await mcpGuard.scan(config);
+        const proposals = buildProposals(scanResult.vulnerabilities);
+
+        const automated = proposals.filter((p) => p.automated).length;
 
         return {
           success: true,
-          fixed: fixed.length,
-          total: vulnerabilities.length,
-          message: `Applied ${fixed.length} automated fixes`,
+          proposals,
+          summary: {
+            total: proposals.length,
+            automated,
+            manual: proposals.length - automated,
+          },
+          scanResult,
         };
       } catch (error) {
         return reply.code(400).send({
